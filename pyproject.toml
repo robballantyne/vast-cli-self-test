@@ -40,11 +40,11 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{ include = "utils" }, { include = "vast.py" }]
+packages = [{ include = "utils" }, { include = "vast.py" }, { include = "vast_cli" }]
 version = "0.0.0"
 
 [project.scripts]
-vastai = "vast:main"
+vastai = "vast_cli.main:main"
 
 [project.urls]
 homepage = "https://cloud.vast.ai/"
