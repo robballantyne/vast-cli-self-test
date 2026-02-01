@@ -508,7 +508,7 @@ def cleanup_machine(args, machine_id):
                 print(rj["msg"])
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
+        print(f"failed with error {r.status_code}")
 
 
 def list_machine(args, id):
@@ -546,7 +546,7 @@ def list_machine(args, id):
             if args.raw:
                 return r
             else:
-                print("offers created/updated for machine {id},  @ ${price_gpu_}/gpu/hr, ${price_inetu_}/GB up, ${price_inetd_}/GB down, {min_chunk_}/min gpus, max discount_rate {discount_rate_}, till {end_date_}, duration {duration_}".format(**locals()))
+                print(f"offers created/updated for machine {id},  @ ${price_gpu_}/gpu/hr, ${price_inetu_}/GB up, ${price_inetd_}/GB down, {min_chunk_}/min gpus, max discount_rate {discount_rate_}, till {end_date_}, duration {duration_}")
                 num_extended = rj.get("extended", 0)
 
                 if num_extended > 0:
@@ -559,7 +559,7 @@ def list_machine(args, id):
                 print(rj["msg"])
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
+        print(f"failed with error {r.status_code}")
 
 
 def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method, instance_id, contract_end_date=None):
@@ -603,7 +603,7 @@ def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method,
         if user_input.strip().lower() == "y":
             scheduled_job_id = response.json()["scheduled_job_id"]
             schedule_job_url = apiurl(args, f"/commands/schedule_job/{scheduled_job_id}/")
-            response = _update_scheduled_job(cli_command, schedule_job_url, frequency, args.start_date, args.end_date, request_body)
+            response = _update_scheduled_job(args, cli_command, schedule_job_url, frequency, args.start_date, args.end_date, request_body)
         else:
             print("Job update aborted by the user.")
     else:
@@ -611,11 +611,9 @@ def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method,
         print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
 
 
-def _update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
-    response = http_put(None, schedule_job_url, headers=state.headers, json=request_body)
+def _update_scheduled_job(args, cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
+    response = http_put(args, schedule_job_url, headers=state.headers, json=request_body)
 
-        # Raise an exception for HTTP errors
-    response.raise_for_status()
     if response.status_code == 200:
         print(f"add_scheduled_job update: success - Scheduling {frequency} job to {cli_command} from {start_date} UTC to {end_date} UTC")
         print(response.json())
@@ -652,20 +650,20 @@ def suppress_stdout():
 
 
 def destroy_instance(id, args):
-    url = apiurl(args, "/instances/{id}/".format(id=id))
+    url = apiurl(args, f"/instances/{id}/")
     r = http_del(args, url, headers=state.headers, json={})
     r.raise_for_status()
     if args.raw:
         return r
     elif (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print("destroying instance {id}.".format(**(locals())));
+            print(f"destroying instance {id}.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 def destroy_instance_silent(id, args):

@@ -47,7 +47,8 @@ def create__workergroup(args):
     else:
         query = " verified=True rentable=True rented=False"
         #query = {"verified": {"eq": True}, "external": {"eq": False}, "rentable": {"eq": True}, "rented": {"eq": False}}
-    search_params = (args.search_params if args.search_params is not None else "" + query).strip()
+    search_params = (args.search_params if args.search_params is not None else "") + query
+    search_params = search_params.strip()
 
     json_blob = {"client_id": "me", "min_load": args.min_load, "target_util": args.target_util, "cold_mult": args.cold_mult, "cold_workers" : args.cold_workers, "test_workers" : args.test_workers, "template_hash": args.template_hash, "template_id": args.template_id, "search_params": search_params, "launch_args": args.launch_args, "gpu_ram": args.gpu_ram, "endpoint_name": args.endpoint_name, "endpoint_id": args.endpoint_id, "autoscaler_instance": args.auto_instance}
 

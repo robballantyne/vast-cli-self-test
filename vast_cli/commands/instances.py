@@ -69,18 +69,17 @@ def start_instance(id, args):
         print("request json: ")
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
-    r.raise_for_status()
 
     if (r.status_code == 200):
         rj = r.json()
         if (rj["success"]):
-            print("starting instance {id}.".format(**(locals())))
+            print(f"starting instance {id}.")
         else:
             print(rj["msg"])
         return True
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
+        print(f"failed with error {r.status_code}")
     return False
 
 
@@ -97,18 +96,17 @@ def stop_instance(id, args):
         print("request json: ")
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
-    r.raise_for_status()
 
     if (r.status_code == 200):
         rj = r.json()
         if (rj["success"]):
-            print("stopping instance {id}.".format(**(locals())))
+            print(f"stopping instance {id}.")
         else:
             print(rj["msg"])
         return True
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
+        print(f"failed with error {r.status_code}")
     return False
 
 
@@ -285,7 +283,7 @@ def change__bid(args: argparse.Namespace):
 
     r = http_put(args, url, headers=state.headers, json=json_blob)
     r.raise_for_status()
-    print("Per gpu bid price changed".format(r.json()))
+    print("Per gpu bid price changed")
 
 
 @parser.command(
@@ -369,14 +367,14 @@ def execute(args):
                 url = rj["result_url"]
                 r = requests.get(url)
                 if (r.status_code == 200):
-                    filtered_text = r.text.replace(rj["writeable_path"], '');
+                    filtered_text = r.text.replace(rj["writeable_path"], '')
                     print(filtered_text)
                     break
         else:
-            print(rj);
+            print(rj)
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -397,13 +395,16 @@ def label__instance(args):
         print("request json: ")
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
-    r.raise_for_status()
 
-    rj = r.json();
-    if rj["success"]:
-        print("label for {args.id} set to {args.label}.".format(**(locals())));
+    if r.status_code == 200:
+        rj = r.json()
+        if rj["success"]:
+            print(f"label for {args.id} set to {args.label}.")
+        else:
+            print(rj["msg"])
     else:
-        print(rj["msg"]);
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -499,7 +500,7 @@ def launch__instance(args):
             field = name.strip("+")
         #print(f"{field} {name} {direction}")
         if field in offers_alias:
-            field = offers_alias[field];
+            field = offers_alias[field]
         order.append([field, direction])
     query["order"] = order
     query["type"] = "on-demand"
@@ -526,7 +527,6 @@ def launch__instance(args):
         "disk": args.disk,
         "q" : query,
         "env" : parse_env(args.env),
-        "disk": args.disk,
         "label": args.label,
         "extra": args.extra,
         "onstart": args.onstart_cmd,
@@ -633,15 +633,18 @@ def prepay__instance(args):
         print("request json: ")
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
-    r.raise_for_status()
 
-    rj = r.json();
-    if rj["success"]:
-        timescale = round( rj["timescale"], 3)
-        discount_rate = 100.0*round( rj["discount_rate"], 3)
-        print("prepaid for {timescale} months of instance {args.id} applying ${args.amount} credits for a discount of {discount_rate}%".format(**(locals())));
+    if r.status_code == 200:
+        rj = r.json()
+        if rj["success"]:
+            timescale = round( rj["timescale"], 3)
+            discount_rate = 100.0*round( rj["discount_rate"], 3)
+            print(f"prepaid for {timescale} months of instance {args.id} applying ${args.amount} credits for a discount of {discount_rate}%")
+        else:
+            print(rj["msg"])
     else:
-        print(rj["msg"]);
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -675,14 +678,14 @@ def reboot__instance(args):
         return
 
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print("Rebooting instance {args.id}.".format(**(locals())));
+            print(f"Rebooting instance {args.id}.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -705,12 +708,12 @@ def recycle__instance(args):
     if (r.status_code == 200):
         rj = r.json()
         if (rj["success"]):
-            print("Recycling instance {args.id}.".format(**(locals())));
+            print(f"Recycling instance {args.id}.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()));
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -833,7 +836,7 @@ def show__instances(args = None, extra = None):
     """
     if args is None: args = {}
     if extra is None: extra = {}
-    req_url = apiurl(args, "/instances", {"owner": "me"});
+    req_url = apiurl(args, "/instances", {"owner": "me"})
     #r = http_get(req_url)
     r = http_get(args, req_url)
     r.raise_for_status()

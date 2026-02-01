@@ -21,7 +21,7 @@ def version_string_sort(a, b) -> int:
     return 0
 
 
-def parse_query(query_str: str, res: Dict = None, fields = {}, field_alias = {}, field_multiplier = {}) -> Dict:
+def parse_query(query_str: str, res: Dict = None, fields = None, field_alias = None, field_multiplier = None) -> Dict:
     """
     Basically takes a query string (like the ones in the examples of commands for the search__offers function) and
     processes it into a dict of URL parameters to be sent to the server.
@@ -34,6 +34,9 @@ def parse_query(query_str: str, res: Dict = None, fields = {}, field_alias = {},
         return res
 
     if res is None: res = {}
+    if fields is None: fields = {}
+    if field_alias is None: field_alias = {}
+    if field_multiplier is None: field_multiplier = {}
     if type(query_str) == list:
         query_str = " ".join(query_str)
     query_str = query_str.strip()

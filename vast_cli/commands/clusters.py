@@ -186,9 +186,8 @@ def show__connections(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, "/users/cloud_integrations/");
-    print(req_url)
-    r = http_get(args, req_url, headers=state.headers);
+    req_url = apiurl(args, "/users/cloud_integrations/")
+    r = http_get(args, req_url, headers=state.headers)
     r.raise_for_status()
     rows = r.json()
 

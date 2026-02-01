@@ -117,7 +117,7 @@ def show__earnings(args):
         except ValueError as e:
             print(f"Warning: Invalid start date format! Ignoring start date! \n {str(e)}")
 
-    req_url = apiurl(args, "/users/me/machine-earnings", {"owner": "me", "sday": sday, "eday": eday, "machid" :args.machine_id});
+    req_url = apiurl(args, "/users/me/machine-earnings", {"owner": "me", "sday": sday, "eday": eday, "machid" :args.machine_id})
     r = http_get(args, req_url)
     r.raise_for_status()
     rows = r.json()
@@ -147,7 +147,7 @@ def show__invoices(args):
     """
 
     sdate,edate = convert_dates_to_timestamps(args)
-    req_url = apiurl(args, "/users/me/invoices", {"owner": "me", "sdate":sdate, "edate":edate, "inc_charges" : not args.only_credits});
+    req_url = apiurl(args, "/users/me/invoices", {"owner": "me", "sdate":sdate, "edate":edate, "inc_charges" : not args.only_credits})
 
     r = http_get(args, req_url)
     r.raise_for_status()
@@ -369,8 +369,8 @@ def show__user(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, "/users/current", {"owner": "me"});
-    r = http_get(args, req_url);
+    req_url = apiurl(args, "/users/current", {"owner": "me"})
+    r = http_get(args, req_url)
     r.raise_for_status()
     user_blob = r.json()
     user_blob.pop("api_key")
@@ -451,11 +451,11 @@ def transfer__credit(args: argparse.Namespace):
     r.raise_for_status()
 
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print(f"Sent {args.amount} to {args.recipient} ".format(r.json()))
+            print(f"Sent {args.amount} to {args.recipient}")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")

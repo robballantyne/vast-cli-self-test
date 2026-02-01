@@ -82,9 +82,13 @@ def cancel__maint(args):
         print("request json: ")
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
-    r.raise_for_status()
-    print(r.text)
-    print(f"Cancel maintenance window(s) scheduled for machine {args.id} success".format(r.json()))
+
+    if r.status_code == 200:
+        print(r.text)
+        print(f"Cancel maintenance window(s) scheduled for machine {args.id} success")
+    else:
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -142,17 +146,17 @@ def delete__machine(args):
     """
     Deletes machine if the machine is not in use by clients. Disregards host jobs on their own machines and force deletes a machine.
     """
-    req_url = apiurl(args, "/machines/{machine_id}/force_delete/".format(machine_id=args.id));
+    req_url = apiurl(args, f"/machines/{args.id}/force_delete/")
     r = http_post(args, req_url, headers=state.headers)
     if (r.status_code == 200):
         rj = r.json()
         if (rj["success"]):
-            print("deleted machine_id ({machine_id}) and all related contracts.".format(machine_id=args.id));
+            print(f"deleted machine_id ({args.id}) and all related contracts.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -329,19 +333,18 @@ def remove__defjob(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, "/machines/{machine_id}/defjob/".format(machine_id=args.id));
-    # print(req_url);
+    req_url = apiurl(args, f"/machines/{args.id}/defjob/")
     r = http_del(args, req_url, headers=state.headers)
 
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print("default instance for machine {machine_id} removed.".format(machine_id=args.id));
+            print(f"default instance for machine {args.id} removed.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 def set_ask(args):
@@ -350,7 +353,7 @@ def set_ask(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    print("set asks!\n");
+    print("set asks!\n")
 
 
 @parser.command(
@@ -374,22 +377,21 @@ def set__defjob(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url   = apiurl(args, "/machines/create_bids/");
+    req_url   = apiurl(args, "/machines/create_bids/")
     json_blob = {'machine': args.id, 'price_gpu': args.price_gpu, 'price_inetu': args.price_inetu, 'price_inetd': args.price_inetd, 'image': args.image, 'args': args.args}
     if (args.explain):
         print("request json: ")
         print(json_blob)
     r = http_put(args, req_url, headers=state.headers, json=json_blob)
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print(
-                "bids created for machine {args.id},  @ ${args.price_gpu}/gpu/day, ${args.price_inetu}/GB up, ${args.price_inetd}/GB down".format(**locals()));
+            print(f"bids created for machine {args.id},  @ ${args.price_gpu}/gpu/day, ${args.price_inetu}/GB up, ${args.price_inetd}/GB down")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -414,7 +416,7 @@ def set__min_bid(args):
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
     r.raise_for_status()
-    print("Per gpu min bid price changed".format(r.json()))
+    print("Per gpu min bid price changed")
 
 
 @parser.command(
@@ -452,7 +454,7 @@ def schedule__maint(args):
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
     r.raise_for_status()
-    print(f"Maintenance window scheduled for {dt} success".format(r.json()))
+    print(f"Maintenance window scheduled for {dt} success")
 
 @parser.command(
     argument("Machine", help="id of machine to display", type=int),
@@ -467,7 +469,7 @@ def show__machine(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, f"/machines/{args.Machine}", {"owner": "me"});
+    req_url = apiurl(args, f"/machines/{args.Machine}", {"owner": "me"})
     r = http_get(args, req_url)
     r.raise_for_status()
     rows = r.json()
@@ -493,7 +495,7 @@ def show__machines(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, "/machines", {"owner": "me"});
+    req_url = apiurl(args, "/machines", {"owner": "me"})
     r = http_get(args, req_url)
     r.raise_for_status()
     rows = r.json()["machines"]
@@ -523,7 +525,7 @@ def show__maints(args):
     machine_ids = args.ids.split(',')
     machine_ids = list(map(int, machine_ids))
 
-    req_url = apiurl(args, "/machines/maintenances", {"owner": "me", "machine_ids" : machine_ids});
+    req_url = apiurl(args, "/machines/maintenances", {"owner": "me", "machine_ids" : machine_ids})
     r = http_get(args, req_url)
     r.raise_for_status()
     rows = r.json()
@@ -583,17 +585,17 @@ def unlist__machine(args):
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
-    req_url = apiurl(args, "/machines/{machine_id}/asks/".format(machine_id=args.id));
+    req_url = apiurl(args, f"/machines/{args.id}/asks/")
     r = http_del(args, req_url, headers=state.headers)
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
-            print("all offers for machine {machine_id} removed, machine delisted.".format(machine_id=args.id));
+            print(f"all offers for machine {args.id} removed, machine delisted.")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 @parser.command(
     argument("id", help="id of network volume offer to unlist", type=int),
@@ -635,7 +637,7 @@ def unlist__volume(args):
     if args.explain:
         print("request json:", json_blob)
 
-    r = http_post(args, url, state.headers, json_blob)
+    r = http_post(args, url, headers=state.headers, json=json_blob)
     r.raise_for_status()
     if args.raw:
         return r

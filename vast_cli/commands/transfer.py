@@ -53,14 +53,14 @@ def cancel__copy(args: argparse.Namespace):
     r = http_del(args, url, headers=state.headers,json=req_json)
     r.raise_for_status()
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
             print("Remote copy canceled - check instance status bar for progress updates (~30 seconds delayed).")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -96,14 +96,14 @@ def cancel__sync(args: argparse.Namespace):
     r = http_del(args, url, headers=state.headers,json=req_json)
     r.raise_for_status()
     if (r.status_code == 200):
-        rj = r.json();
+        rj = r.json()
         if (rj["success"]):
             print("Remote copy canceled - check instance status bar for progress updates (~30 seconds delayed).")
         else:
-            print(rj["msg"]);
+            print(rj["msg"])
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -249,7 +249,7 @@ def copy(args: argparse.Namespace):
                     print(rj["msg"])
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()));
+        print(f"failed with error {r.status_code}")
 
 
 '''
@@ -423,8 +423,8 @@ def cloud__copy(args: argparse.Namespace):
         print("Cloud Copy Started - check instance status bar for progress updates (~30 seconds delayed).")
         print("When the operation is finished you should see 'Cloud Copy Operation Finished' in the instance status bar.")
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")
 
 
 @parser.command(
@@ -490,5 +490,5 @@ def take__snapshot(args: argparse.Namespace):
         else:
             print(data.get("msg", "Unknown error with snapshot request"))
     else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
+        print(r.text)
+        print(f"failed with error {r.status_code}")

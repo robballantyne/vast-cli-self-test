@@ -192,7 +192,7 @@ def convert_dates_to_timestamps(args):
             start_date_txt = start_date.isoformat()
             start_timestamp = time.mktime(start_date.timetuple())
         except ValueError as e:
-            print(f"Warning: Invalid start date format! Ignoring end date! \n {str(e)}")
+            print(f"Warning: Invalid start date format! Ignoring start date! \n {str(e)}")
 
     return start_timestamp, end_timestamp
 

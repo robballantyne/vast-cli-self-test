@@ -58,7 +58,6 @@ def delete__api_key(args):
 def reset__api_key(args):
     """Caution: a bad API key will make it impossible to connect to the servers.
     """
-    print('fml')
     #url = apiurl(args, "/users/current/reset-apikey/", {"owner": "me"})
     url = apiurl(args, "/commands/reset_apikey/" )
     json_blob = {"client_id": "me",}
@@ -67,7 +66,7 @@ def reset__api_key(args):
         print(json_blob)
     r = http_put(args, url,  headers=state.headers,json=json_blob)
     r.raise_for_status()
-    print("api-key reset ".format(r.json()))
+    print(f"api-key reset {r.json()}")
 
 
 @parser.command(

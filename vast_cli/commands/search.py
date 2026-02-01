@@ -301,7 +301,7 @@ def search__offers(args):
                 field = name.strip("+")
             #print(f"{field} {name} {direction}")
             if field in offers_alias:
-                field = offers_alias[field];
+                field = offers_alias[field]
             order.append([field, direction])
 
         query["order"] = order
@@ -454,4 +454,4 @@ def search__templates(args):
             display_table(rows, displayable_fields)
     else:
         print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
+        print(f"failed with error {r.status_code}")
