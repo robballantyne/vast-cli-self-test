@@ -10,7 +10,7 @@ TABCOMPLETE = False
 try:
     import argcomplete
     TABCOMPLETE = True
-except:
+except ImportError:
     # No tab-completion for you
     pass
 

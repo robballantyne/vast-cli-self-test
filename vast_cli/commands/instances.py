@@ -15,7 +15,6 @@ from vast_cli.parser import parser, argument
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl, apiheaders
-from vast_cli.config import server_url_default, CACHE_FILE, CACHE_DURATION
 from vast_cli.display.formatting import deindent
 from vast_cli.display.table import display_table
 from vast_cli.query.fields import instance_fields, offers_fields, offers_alias, offers_mult
@@ -24,7 +23,11 @@ from vast_cli.validation.validators import (
     parse_env, validate_frequency_values, default_start_date, default_end_date,
     parse_day_cron_style, parse_hour_cron_style, strip_strings,
     validate_volume_params, validate_portal_config,
-    convert_dates_to_timestamps, convert_timestamp_to_date,
+)
+from vast_cli.helpers import (
+    exec_with_threads, split_list, _get_gpu_names, REGIONS,
+    _is_valid_region, _parse_region, destroy_instance,
+    add_scheduled_job, _update_scheduled_job,
 )
 
 
@@ -51,118 +54,6 @@ def get_runtype(args):
         runtype = 'ssh_direc ssh_proxy' if args.direct else 'ssh_proxy'
 
     return runtype
-
-
-def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method, instance_id, contract_end_date=None):
-    start_timestamp, end_timestamp = convert_dates_to_timestamps(args)
-    if args.end_date is None:
-        end_timestamp=contract_end_date
-        args.end_date = convert_timestamp_to_date(contract_end_date)
-
-    if start_timestamp >= end_timestamp:
-        raise ValueError("--start_date must be less than --end_date.")
-
-    day, hour, frequency = args.day, args.hour, args.schedule
-
-    schedule_job_url = apiurl(args, f"/commands/schedule_job/")
-
-    request_body = {
-                "start_time": start_timestamp,
-                "end_time": end_timestamp,
-                "api_endpoint": api_endpoint,
-                "request_method": request_method,
-                "request_body": req_json,
-                "day_of_the_week": day,
-                "hour_of_the_day": hour,
-                "frequency": frequency,
-                "instance_id": instance_id
-            }
-                # Send a POST request
-    response = requests.post(schedule_job_url, headers=state.headers, json=request_body)
-
-    if args.explain:
-        print("request json: ")
-        print(request_body)
-
-        # Handle the response based on the status code
-    if response.status_code == 200:
-        print(f"add_scheduled_job insert: success - Scheduling {frequency} job to {cli_command} from {args.start_date} UTC to {args.end_date} UTC")
-    elif response.status_code == 401:
-        print(f"add_scheduled_job insert: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
-    elif response.status_code == 422:
-        user_input = input("Existing scheduled job found. Do you want to update it (y|n)? ")
-        if user_input.strip().lower() == "y":
-            scheduled_job_id = response.json()["scheduled_job_id"]
-            schedule_job_url = apiurl(args, f"/commands/schedule_job/{scheduled_job_id}/")
-            response = _update_scheduled_job(cli_command, schedule_job_url, frequency, args.start_date, args.end_date, request_body)
-        else:
-            print("Job update aborted by the user.")
-    else:
-            # print(r.text)
-        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
-
-
-def _update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
-    response = requests.put(schedule_job_url, headers=state.headers, json=request_body)
-
-        # Raise an exception for HTTP errors
-    response.raise_for_status()
-    if response.status_code == 200:
-        print(f"add_scheduled_job update: success - Scheduling {frequency} job to {cli_command} from {start_date} UTC to {end_date} UTC")
-        print(response.json())
-    elif response.status_code == 401:
-        print(f"add_scheduled_job update: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
-    else:
-        print(f"add_scheduled_job update: failed error: {response.status_code}. Response body: {response.text}")
-
-
-def exec_with_threads(f, args, nt=16, max_retries=5):
-    import math
-    from concurrent.futures import ThreadPoolExecutor
-
-    def worker(sub_args):
-        for arg in sub_args:
-            retries = 0
-            while retries <= max_retries:
-                try:
-                    result = None
-                    if isinstance(arg,tuple):
-                        result = f(*arg)
-                    else:
-                        result = f(arg)
-                    if result:  # Assuming a truthy return value means success
-                        break
-                except Exception as e:
-                    print(str(e))
-                    pass
-                retries += 1
-                stime = 0.25 * 1.3 ** retries
-                print(f"retrying in {stime}s")
-                time.sleep(stime)  # Exponential backoff
-
-    # Split args into nt sublists
-    args_per_thread = math.ceil(len(args) / nt)
-    sublists = [args[i:i + args_per_thread] for i in range(0, len(args), args_per_thread)]
-
-    with ThreadPoolExecutor(max_workers=nt) as executor:
-        executor.map(worker, sublists)
-
-
-def split_into_sublists(lst, k):
-    # Calculate the size of each sublist
-    sublist_size = (len(lst) + k - 1) // k
-
-    # Create the sublists using list comprehension
-    sublists = [lst[i:i + sublist_size] for i in range(0, len(lst), sublist_size)]
-
-    return sublists
-
-
-def split_list(lst, k):
-    """
-    Splits a list into sublists of maximum size k.
-    """
-    return [lst[i:i + k] for i in range(0, len(lst), k)]
 
 
 def start_instance(id, args):
@@ -221,78 +112,6 @@ def stop_instance(id, args):
     return False
 
 
-def destroy_instance(id, args):
-    url = apiurl(args, "/instances/{id}/".format(id=id))
-    r = http_del(args, url, headers=state.headers,json={})
-    r.raise_for_status()
-    if args.raw:
-        return r
-    elif (r.status_code == 200):
-        rj = r.json();
-        if (rj["success"]):
-            print("destroying instance {id}.".format(**(locals())));
-        else:
-            print(rj["msg"]);
-    else:
-        print(r.text);
-        print("failed with error {r.status_code}".format(**locals()));
-
-
-# ---------------------------------------------------------------------------
-# Helper functions used by launch__instance
-# ---------------------------------------------------------------------------
-
-def _get_gpu_names() -> List[str]:
-    """Returns a set of GPU names available on Vast.ai, with results cached for 24 hours."""
-
-    def is_cache_valid() -> bool:
-        """Checks if the cache file exists and is less than 24 hours old."""
-        if not os.path.exists(CACHE_FILE):
-            return False
-        cache_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(CACHE_FILE))
-        return cache_age < CACHE_DURATION
-
-    if is_cache_valid():
-        with open(CACHE_FILE, "r") as file:
-            gpu_names = json.load(file)
-    else:
-        endpoint = "/api/v0/gpu_names/unique/"
-        url = f"{server_url_default}{endpoint}"
-        r = requests.get(url, headers={})
-        r.raise_for_status()  # Will raise an exception for HTTP errors
-        gpu_names = r.json()
-        with open(CACHE_FILE, "w") as file:
-            json.dump(gpu_names, file)
-
-    formatted_gpu_names = [
-        name.replace(" ", "_").replace("-", "_") for name in gpu_names['gpu_names']
-    ]
-    return formatted_gpu_names
-
-
-REGIONS = {
-"North_America": "[AG, BS, BB, BZ, CA, CR, CU, DM, DO, SV, GD, GT, HT, HN, JM, MX, NI, PA, KN, LC, VC, TT, US]",
-"South_America": "[AR, BO, BR, CL, CO, EC, FK, GF, GY, PY, PE, SR, UY, VE]",
-"Europe": "[AL, AD, AT, BY, BE, BA, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IS, IE, IT, LV, LI, LT, LU, MT, MD, MC, ME, NL, MK, NO, PL, PT, RO, RU, SM, RS, SK, SI, ES, SE, CH, UA, GB, VA, XK]",
-"Asia": "[AF, AM, AZ, BH, BD, BT, BN, KH, CN, GE, IN, ID, IR, IQ, IL, JP, JO, KZ, KW, KG, LA, LB, MY, MV, MN, MM, NP, KP, OM, PK, PH, QA, SA, SG, KR, LK, SY, TW, TJ, TH, TL, TR, TM, AE, UZ, VN, YE, HK, MO]",
-"Oceania": "[AS, AU, CK, FJ, PF, GU, KI, MH, FM, NR, NC, NZ, NU, MP, PW, PG, PN, WS, SB, TK, TO, TV, VU, WF]",
-"Africa": "[DZ, AO, BJ, BW, BF, BI, CV, CM, CF, TD, KM, CG, CD, CI, DJ, EG, GQ, ER, SZ, ET, GA, GM, GH, GN, GW, KE, LS, LR, LY, MG, MW, ML, MR, MU, MA, MZ, NA, NE, NG, RW, ST, SN, SC, SL, SO, ZA, SS, SD, TZ, TG, TN, UG, ZM, ZW]"
-}
-
-def _is_valid_region(region):
-    """region is valid if it is a key in REGIONS or a string list of country codes."""
-    if region in REGIONS:
-        return True
-    if region.startswith("[") and region.endswith("]"):
-        country_codes = region[1:-1].split(',')
-        return all(len(code.strip()) == 2 for code in country_codes)
-    return False
-
-def _parse_region(region):
-    """Returns a string in a list format of two-char country codes."""
-    if region in REGIONS:
-        return REGIONS[region]
-    return region
 
 
 # ===========================================================================
@@ -1019,10 +838,11 @@ def show__instances(args = None, extra = None):
     r = http_get(args, req_url)
     r.raise_for_status()
     rows = r.json()["instances"]
-    for row in rows:
+    for i, row in enumerate(rows):
         row = {k: strip_strings(v) for k, v in row.items()}
         row['duration'] = time.time() - row['start_date']
         row['extra_env'] = {env_var[0]: env_var[1] for env_var in row['extra_env']}
+        rows[i] = row
     if 'internal' in extra:
         return [str(row[extra['field']]) for row in rows]
     elif args.quiet:

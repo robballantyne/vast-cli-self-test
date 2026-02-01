@@ -132,7 +132,7 @@ def update__ssh_key(args):
         "ssh_key": ssh_key,
     }
 
-    r = http_put(args, url, json=payload)
+    r = http_put(args, url, headers=state.headers, json=payload)
     r.raise_for_status()
     print(r.json())
 
@@ -173,7 +173,7 @@ def _ssh_url(args, protocol):
     try:
         with open(f"{DIRS['temp']}/ssh_{args.id}.json", 'r') as openfile:
             json_object = json.load(openfile)
-    except:
+    except (OSError, json.JSONDecodeError):
         pass
 
     port      = None
@@ -211,7 +211,7 @@ def _ssh_url(args, protocol):
             else:
                 ipaddr = instance["ssh_host"]
                 port   = int(instance["ssh_port"])+1 if "jupyter" in instance["image_runtype"] else int(instance["ssh_port"])
-        except:
+        except (KeyError, TypeError, ValueError, IndexError):
             port = -1
 
     if (port > 0):
@@ -224,5 +224,5 @@ def _ssh_url(args, protocol):
     try:
         with open(f"{DIRS['temp']}/ssh_{args.id}.json", "w") as outfile:
             json.dump({"ipaddr":ipaddr, "port":port}, outfile)
-    except:
+    except OSError:
         pass

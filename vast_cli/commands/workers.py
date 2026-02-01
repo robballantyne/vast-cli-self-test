@@ -94,7 +94,7 @@ def create__endpoint(args):
     if (args.explain):
         print("request json: ")
         print(json_blob)
-    r = requests.post(url, headers=state.headers,json=json_blob)
+    r = http_post(args, url, headers=state.headers, json=json_blob)
     r.raise_for_status()
     if 'application/json' in r.headers.get('Content-Type', ''):
         try:

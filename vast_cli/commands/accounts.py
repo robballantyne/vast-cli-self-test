@@ -3,8 +3,6 @@
 import json
 import argparse
 
-import requests
-
 from vast_cli.parser import parser, argument
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
@@ -284,7 +282,7 @@ def reports(args):
         print("request json: ")
         print(json_blob)
 
-    r = requests.get(url, headers=state.headers, json=json_blob)
+    r = http_get(args, url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if (r.status_code == 200):

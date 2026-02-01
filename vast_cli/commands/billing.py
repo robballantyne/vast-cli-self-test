@@ -7,8 +7,6 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Dict, List
 
-import requests
-
 from vast_cli.parser import parser, argument
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
@@ -29,7 +27,7 @@ from vast_cli.validation.validators import (
     convert_dates_to_timestamps,
     convert_timestamp_to_date,
 )
-from vast_cli.helpers import filter_invoice_items, format_invoices_charges_results
+from vast_cli.helpers import filter_invoice_items, format_invoices_charges_results, select, to_timestamp_
 
 
 def sum_field(X, k):
@@ -38,25 +36,6 @@ def sum_field(X, k):
         a = float(x.get(k,0))
         y += a
     return y
-
-def select(X,k):
-    Y = set()
-    for x in X:
-        v = x.get(k,None)
-        if v is not None:
-            Y.add(v)
-    return Y
-
-
-# Helper to convert date string or int to timestamp
-def to_timestamp_(val):
-    if isinstance(val, int):
-        return val
-    if isinstance(val, str):
-        if val.isdigit():
-            return int(val)
-        return int(datetime.strptime(val + "+0000", '%Y-%m-%d%z').timestamp())
-    raise ValueError("Invalid date format")
 
 charge_types = ['instance','volume','serverless', 'i', 'v', 's']
 invoice_types = {
@@ -436,7 +415,7 @@ def set__user(args):
     with open(args.file, 'r') as file:
         params = json.load(file)
     url = apiurl(args, "/users/")
-    r = requests.put(url, headers=state.headers, json=params)
+    r = http_put(args, url, headers=state.headers, json=params)
     r.raise_for_status()
     print(f"{r.json()}")
 

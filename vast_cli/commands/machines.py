@@ -120,7 +120,7 @@ def defrag__machines(args):
     if (args.explain):
         print("request json: ")
         print(json_blob)
-    r = requests.put(url, headers=state.headers,json=json_blob)
+    r = http_put(args, url, headers=state.headers, json=json_blob)
     r.raise_for_status()
     if 'application/json' in r.headers.get('Content-Type', ''):
         try:
@@ -213,7 +213,6 @@ def list__machines(args):
     """
     """
     return [list_machine(args, id) for id in args.ids]
-    return res
 
 
 @parser.command(

@@ -32,7 +32,7 @@ def create__cluster(args: argparse.Namespace):
         print(json_blob)
 
     req_url = apiurl(args, "/cluster/")
-    r  = http_post(args, req_url, json=json_blob)
+    r  = http_post(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -58,7 +58,7 @@ def create__overlay(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/overlay/")
-    r = http_post(args, req_url, json=json_blob)
+    r = http_post(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -82,7 +82,7 @@ def delete__cluster(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/cluster/")
-    r = http_del(args, req_url, json=json_blob)
+    r = http_del(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -112,7 +112,7 @@ def delete__overlay(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/overlay/")
-    r = http_del(args, req_url, json=json_blob)
+    r = http_del(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -139,7 +139,7 @@ def join__cluster(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/cluster/")
-    r = http_put(args, req_url, json=json_blob)
+    r = http_put(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -166,7 +166,7 @@ def join__overlay(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/overlay/")
-    r = http_put(args, req_url, json=json_blob)
+    r = http_put(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:
@@ -207,7 +207,7 @@ def show__connections(args):
 )
 def show__clusters(args: argparse.Namespace):
     req_url = apiurl(args, "/clusters/")
-    r = http_get(args, req_url)
+    r = http_get(args, req_url, headers=state.headers)
     r.raise_for_status()
     response_data = r.json()
 
@@ -243,7 +243,7 @@ def show__clusters(args: argparse.Namespace):
 )
 def show__overlays(args: argparse.Namespace):
     req_url = apiurl(args, "/overlay/")
-    r = http_get(args, req_url)
+    r = http_get(args, req_url, headers=state.headers)
     r.raise_for_status()
     response_data = r.json()
     if args.raw:
@@ -283,7 +283,7 @@ def remove_machine_from_cluster(args: argparse.Namespace):
         print("request json:", json_blob)
 
     req_url = apiurl(args, "/cluster/remove_machine/")
-    r = http_del(args, req_url, json=json_blob)
+    r = http_del(args, req_url, headers=state.headers, json=json_blob)
     r.raise_for_status()
 
     if args.raw:

@@ -2,6 +2,8 @@ import re
 import sys
 from typing import Dict
 
+from vast_cli.helpers import numeric_version
+
 
 def version_string_sort(a, b) -> int:
     """
@@ -17,29 +19,6 @@ def version_string_sort(a, b) -> int:
     b_parts = b.split(".")
 
     return 0
-
-
-def numeric_version(version_str):
-    try:
-        # Split the version string by the period
-        major, minor, patch = version_str.split('.')
-
-        # Pad each part with leading zeros to make it 3 digits
-        major = major.zfill(3)
-        minor = minor.zfill(3)
-        patch = patch.zfill(3)
-
-        # Concatenate the padded parts
-        numeric_version_str = f"{major}{minor}{patch}"
-
-        # Convert the concatenated string to an integer
-        result = int(numeric_version_str)
-        #print(result)
-        return result
-
-    except ValueError:
-        print("Invalid version string format. Expected format: X.X.X")
-        return None
 
 
 def parse_query(query_str: str, res: Dict = None, fields = {}, field_alias = {}, field_multiplier = {}) -> Dict:
@@ -185,7 +164,7 @@ def parse_vast_url(url_str):
         try:
             instance_id = int(path)
             path = "/"
-        except:
+        except (ValueError, TypeError):
             pass
 
     valid_unix_path_regex = re.compile('^(/)?([^/\0]+(/)?)+$')

@@ -2,7 +2,6 @@
 
 import json
 import time
-import requests
 
 from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
@@ -78,10 +77,10 @@ def search__benchmarks(args):
         return 1
     #url = apiurl(args, "/benchmarks", {"select_cols" : ['id','last_update','machine_id','score'], "select_filters" : query})
     url = apiurl(args, "/benchmarks", {"select_cols" : ['*'], "select_filters" : query})
-    r = requests.get(url, headers=state.headers)
+    r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
     rows = r.json()
-    if True: # args.raw:
+    if args.raw:
         return rows
     else:
         display_table(rows, displayable_fields)
@@ -155,10 +154,10 @@ def search__invoices(args):
         print("Error: ", e)
         return 1
     url = apiurl(args, "/invoices", {"select_cols" : ['*'], "select_filters" : query})
-    r = requests.get(url, headers=state.headers)
+    r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
     rows = r.json()
-    if True: # args.raw:
+    if args.raw:
         return rows
     else:
         display_table(rows, displayable_fields)
@@ -449,7 +448,7 @@ def search__templates(args):
         r.raise_for_status()
     elif 'json' in r.headers.get("Content-Type"):
         rows = r.json().get('templates', [])
-        if True: #args.raw:
+        if args.raw:
             print(json.dumps(rows, indent=1, sort_keys=True))
         else:
             display_table(rows, displayable_fields)

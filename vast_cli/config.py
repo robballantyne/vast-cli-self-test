@@ -1,32 +1,19 @@
 """Constants and configuration for vast_cli."""
 
-from __future__ import unicode_literals, print_function
-
+import json
 import os
 import sys
 import shutil
 import logging
 from datetime import timedelta
+from urllib.parse import quote_plus
 
 
 PYPI_BASE_PATH = "https://pypi.org"
 # INFO - Change to False if you don't want to check for update each run.
 should_check_for_update = False
 
-try:
-    from urllib import quote_plus  # Python 2.X
-except ImportError:
-    from urllib.parse import quote_plus  # Python 3+
-
-try:
-    JSONDecodeError = __import__('json').JSONDecodeError
-except AttributeError:
-    JSONDecodeError = ValueError
-
-try:
-    input = raw_input
-except NameError:
-    pass
+JSONDecodeError = json.JSONDecodeError
 
 #server_url_default = "https://vast.ai"
 server_url_default = os.getenv("VAST_URL") or "https://console.vast.ai"
@@ -63,7 +50,7 @@ try:
       'temp': xdg.xdg_cache_home()
   }
 
-except:
+except ImportError:
   # Reasonable defaults.
   DIRS = {
       'config': os.path.join(os.getenv('HOME'), '.config'),

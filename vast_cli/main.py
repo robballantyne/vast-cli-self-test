@@ -1,7 +1,5 @@
 """Main entry point for vast_cli."""
 
-from __future__ import unicode_literals, print_function
-
 import os
 import sys
 import json
