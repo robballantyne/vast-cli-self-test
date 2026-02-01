@@ -4,7 +4,7 @@ import json
 import argparse
 import subprocess
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -22,19 +22,20 @@ from vast_cli.helpers import add_scheduled_job, _update_scheduled_job
 
 @parser.command(
     argument("dst", help="instance_id:/path to target of copy operation", type=str),
-    usage="vastai cancel copy DST",
+    aliases=hidden_aliases(["cancel copy"]),
+    usage="vastai copy cancel DST",
     help="Cancel a remote copy in progress, specified by DST id",
     epilog=deindent("""
         Use this command to cancel any/all current remote copy operations copying to a specific named instance, given by DST.
 
         Examples:
-         vast cancel copy 12371
+         vast copy cancel 12371
 
         The first example cancels all copy operations currently copying data into instance 12371
 
     """),
 )
-def cancel__copy(args: argparse.Namespace):
+def copy__cancel(args: argparse.Namespace):
     """
     Cancel a remote copy in progress, specified by DST id"
 
@@ -65,19 +66,20 @@ def cancel__copy(args: argparse.Namespace):
 
 @parser.command(
     argument("dst", help="instance_id:/path to target of sync operation", type=str),
-    usage="vastai cancel sync DST",
+    aliases=hidden_aliases(["cancel sync"]),
+    usage="vastai sync cancel DST",
     help="Cancel a remote copy in progress, specified by DST id",
     epilog=deindent("""
         Use this command to cancel any/all current remote cloud sync operations copying to a specific named instance, given by DST.
 
         Examples:
-         vast cancel sync 12371
+         vast sync cancel 12371
 
         The first example cancels all copy operations currently copying data into instance 12371
 
     """),
 )
-def cancel__sync(args: argparse.Namespace):
+def sync__cancel(args: argparse.Namespace):
     """
     Cancel a remote cloud sync in progress, specified by DST id"
 
@@ -111,14 +113,15 @@ def cancel__sync(args: argparse.Namespace):
     argument("dest", help="id of volume offer volume is being copied to", type=int),
     argument("-s", "--size", help="Size of new volume contract, in GB. Must be greater than or equal to the source volume, and less than or equal to the destination offer.", type=float),
     argument("-d", "--disable_compression", action="store_true", help="Do not compress volume data before copying."),
-    usage="vastai copy volume <source_id> <dest_id> [options]",
+    aliases=hidden_aliases(["clone volume"]),
+    usage="vastai volume clone <source_id> <dest_id> [options]",
     help="Clone an existing volume",
     epilog=deindent("""
         Create a new volume with the given offer, by copying the existing volume.
         Size defaults to the size of the existing volume, but can be increased if there is available space.
     """)
 )
-def clone__volume(args: argparse.Namespace):
+def volume__clone(args: argparse.Namespace):
     json_blob={
         "src_id" : args.source,
         "dst_id": args.dest,
@@ -146,7 +149,8 @@ def clone__volume(args: argparse.Namespace):
     argument("src", help="Source location for copy operation (supports multiple formats)", type=str),
     argument("dst", help="Target location for copy operation (supports multiple formats)", type=str),
     argument("-i", "--identity", help="Location of ssh private key", type=str),
-    usage="vastai copy SRC DST",
+    aliases=hidden_aliases(["copy"]),
+    usage="vastai instance copy SRC DST",
     help="Copy directories between instances and/or local",
     epilog=deindent("""
         Copies a directory from a source location to a target location. Each of source and destination
@@ -166,12 +170,12 @@ def clone__volume(args: argparse.Namespace):
         Volume copy is currently only supported for copying to other volumes or instances, not cloud services or local.
 
         Examples:
-         vast copy 6003036:/workspace/ 6003038:/workspace/
-         vast copy C.11824:/data/test local:data/test
-         vast copy local:data/test C.11824:/data/test
-         vast copy drive:/folder/file.txt C.6003036:/workspace/
-         vast copy s3.101:/data/ C.6003036:/workspace/
-         vast copy V.1234:/file C.5678:/workspace/
+         vast instance copy 6003036:/workspace/ 6003038:/workspace/
+         vast instance copy C.11824:/data/test local:data/test
+         vast instance copy local:data/test C.11824:/data/test
+         vast instance copy drive:/folder/file.txt C.6003036:/workspace/
+         vast instance copy s3.101:/data/ C.6003036:/workspace/
+         vast instance copy V.1234:/file C.5678:/workspace/
 
         The first example copy syncs all files from the absolute directory '/workspace' on instance 6003036 to the directory '/workspace' on instance 6003038.
         The second example copy syncs files from container 11824 to the local machine using structured syntax.
@@ -180,7 +184,7 @@ def clone__volume(args: argparse.Namespace):
         The fifth example copy syncs files from S3 bucket with id 101 to an instance.
     """),
 )
-def copy(args: argparse.Namespace):
+def instance__copy(args: argparse.Namespace):
     """
     Transfer data from one instance to another.
 
@@ -322,7 +326,8 @@ def vm__copy(args: argparse.Namespace):
     argument("--end_date", type=str, help="End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is contract's end. (optional)"),
     argument("--day", type=parse_day_cron_style, help="Day of week you want scheduled job to run on (0-6, where 0=Sunday) or \"*\". Default will be 0. For ex. --day 0", default=0),
     argument("--hour", type=parse_hour_cron_style, help="Hour of day you want scheduled job to run on (0-23) or \"*\" (UTC). Default will be 0. For ex. --hour 16", default=0),
-    usage="vastai cloud copy --src SRC --dst DST --instance INSTANCE_ID -connection CONNECTION_ID --transfer TRANSFER_TYPE",
+    aliases=hidden_aliases(["cloud copy"]),
+    usage="vastai instance cloud-copy --src SRC --dst DST --instance INSTANCE_ID -connection CONNECTION_ID --transfer TRANSFER_TYPE",
     help="Copy files/folders to and from cloud providers",
     epilog=deindent("""
         Copies a directory from a source location to a target location. Each of source and destination
@@ -331,17 +336,17 @@ def vm__copy(args: argparse.Namespace):
         You can find more information about the cloud copy operation here: https://vast.ai/docs/gpu-instances/cloud-sync
 
         Examples:
-         vastai show connections
+         vastai cluster connections
          ID    NAME      Cloud Type
          1001  test_dir  drive
          1003  data_dir  drive
 
-         vastai cloud copy --src /folder --dst /workspace --instance 6003036 --connection 1001 --transfer "Instance To Cloud"
+         vastai instance cloud-copy --src /folder --dst /workspace --instance 6003036 --connection 1001 --transfer "Instance To Cloud"
 
         The example copies all contents of /folder into /workspace on instance 6003036 from gdrive connection 'test_dir'.
     """),
 )
-def cloud__copy(args: argparse.Namespace):
+def instance__cloud_copy(args: argparse.Namespace):
     """
     Transfer data from one instance to another.
 
@@ -434,7 +439,8 @@ def cloud__copy(args: argparse.Namespace):
     argument("--docker_login_user",help="Username for container registry with repo",     type=str),
     argument("--docker_login_pass",help="Password or token for container registry with repo",     type=str),
     argument("--pause",            help="Pause container's processes being executed by the CPU to take snapshot (true/false). Default will be true", type=str, default="true"),
-    usage="vastai take snapshot INSTANCE_ID "
+    aliases=hidden_aliases(["take snapshot"]),
+    usage="vastai volume snapshot INSTANCE_ID "
           "--repo REPO --docker_login_user USER --docker_login_pass PASS"
           "[--container_registry REGISTRY] [--pause true|false]",
     help="Schedule a snapshot of a running container and push it to your repo in a container registry",
@@ -446,7 +452,7 @@ def cloud__copy(args: argparse.Namespace):
         consistent snapshot).
     """),
 )
-def take__snapshot(args: argparse.Namespace):
+def volume__snapshot(args: argparse.Namespace):
     """
     Take a container snapshot and push.
 

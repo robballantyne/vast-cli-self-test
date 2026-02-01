@@ -8,7 +8,7 @@ import argparse
 
 import requests
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.config import APIKEY_FILE, server_url_default, INFO, SUCCESS, FAIL, WARN
 from vast_cli.api.client import http_get, http_post, http_put, http_del
@@ -27,28 +27,29 @@ from vast_cli.helpers import (check_requirements, wait_for_instance, safe_float,
     argument("--url", help="Server REST API URL", default="https://console.vast.ai"),
     argument("--retry", help="Retry limit", type=int, default=3),
     argument("--ignore-requirements", action="store_true", help="Ignore the minimum system requirements and run the self test regardless"),
-    usage="vastai self-test machine <machine_id> [--debugging] [--explain] [--api_key API_KEY] [--url URL] [--retry RETRY] [--raw] [--ignore-requirements]",
+    aliases=hidden_aliases(["self-test machine"]),
+    usage="vastai machine self-test <machine_id> [--debugging] [--explain] [--api_key API_KEY] [--url URL] [--retry RETRY] [--raw] [--ignore-requirements]",
     help="[Host] Perform a self-test on the specified machine",
     epilog=deindent("""
         This command tests if a machine meets specific requirements and
         runs a series of tests to ensure it's functioning correctly.
 
         Examples:
-         vast self-test machine 12345
-         vast self-test machine 12345 --debugging
-         vast self-test machine 12345 --explain
-         vast self-test machine 12345 --api_key <YOUR_API_KEY>
+         vast machine self-test 12345
+         vast machine self-test 12345 --debugging
+         vast machine self-test 12345 --explain
+         vast machine self-test 12345 --api_key <YOUR_API_KEY>
     """),
 )
 
-def self_test__machine(args):
+def machine__self_test(args):
     """
     Performs a self-test on the specified machine to verify its compliance with
     required specifications and functionality.
     """
     # Lazy import to avoid circular dependencies
-    from vast_cli.commands.search import search__offers
-    from vast_cli.commands.instances import create__instance
+    from vast_cli.commands.search import offer__search
+    from vast_cli.commands.instances import instance__create
 
     instance_id = None  # Store instance ID for cleanup if needed
     result = {"success": False, "reason": ""}
@@ -152,7 +153,7 @@ def self_test__machine(args):
                 retry=args.retry,
                 debugging=args.debugging,
             )
-            offers = search__offers(search_args)
+            offers = offer__search(search_args)
             if not offers:
                 progress_print(args, f"Machine ID {machine_id} not found or not rentable.")
                 return None
@@ -207,7 +208,7 @@ def self_test__machine(args):
             # Create instance
             try:
                 progress_print(args, f"Starting test with {docker_image}")
-                response = create__instance(create_args)
+                response = instance__create(create_args)
                 if isinstance(response, requests.Response):  # Check if it's an HTTP response
                     if response.status_code == 200:
                         try:

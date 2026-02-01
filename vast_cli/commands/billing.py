@@ -7,7 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Dict, List
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -52,10 +52,11 @@ invoice_types = {
 
 @parser.command(
     argument("id", help="id of instance to get info for", type=int),
-    usage="vastai show deposit ID [options]",
+    aliases=hidden_aliases(["show deposit"]),
+    usage="vastai instance deposit ID [options]",
     help="Display reserve deposit info for an instance"
 )
-def show__deposit(args):
+def instance__deposit(args):
     """
     Shows reserve deposit info for an instance.
 
@@ -73,10 +74,11 @@ def show__deposit(args):
     argument("-s", "--start_date", help="start date and time for report. Many formats accepted", type=str),
     argument("-e", "--end_date", help="end date and time for report. Many formats accepted ", type=str),
     argument("-m", "--machine_id", help="Machine id (optional)", type=int),
-    usage="vastai show earnings [OPTIONS]",
+    aliases=hidden_aliases(["show earnings"]),
+    usage="vastai machine earnings [OPTIONS]",
     help="Get machine earning history reports",
 )
-def show__earnings(args):
+def machine__earnings(args):
     """
     Show earnings history for a time range, optionally per machine. Various options available to limit time range and type of items.
 
@@ -134,10 +136,11 @@ def show__earnings(args):
     argument("-c", "--only_charges", action="store_true", help="Show only charge items"),
     argument("-p", "--only_credits", action="store_true", help="Show only credit items"),
     argument("--instance_label", help="Filter charges on a particular instance label (useful for autoscaler groups)"),
-    usage="(DEPRECATED) vastai show invoices [OPTIONS]",
+    aliases=hidden_aliases(["show invoices"]),
+    usage="(DEPRECATED) vastai invoice list [OPTIONS]",
     help="(DEPRECATED) Get billing history reports",
 )
-def show__invoices(args):
+def invoice__list(args):
     """
     Show current payments and charges. Various options available to limit time range and type
     of items. Default is to show everything for user's entire billing history.
@@ -219,32 +222,33 @@ def show__invoices(args):
     argument('-f', '--format', choices=['table', 'tree'], default='table', help='Output format for charges (default: table)'),
     argument('-v', '--verbose', action='store_true', help='Include full Instance Charge details and Invoice Metadata (tree view only)'),
     argument('--latest-first', action='store_true', help='Sort by latest first'),
-    usage="vastai show invoices-v1 [OPTIONS]",
+    aliases=hidden_aliases(["show invoices-v1"]),
+    usage="vastai invoice list-v1 [OPTIONS]",
     help="Get billing (invoices/charges) history reports with advanced filtering and pagination",
     epilog=deindent("""
         This command supports colored output and rich formatting if the 'rich' python module is installed!
 
         Examples:
             # Show the first 20 invoices in the last week  (note: default window is a 7 day period ending today)
-            vastai show invoices-v1 --invoices
+            vastai invoice list-v1 --invoices
 
             # Show the first 50 charges over a 7 day period starting from 2025-11-30 in tree format
-            vastai show invoices-v1 --charges -s 2025-11-30 -f tree -l 50
+            vastai invoice list-v1 --charges -s 2025-11-30 -f tree -l 50
 
             # Show the first 20 invoices of specific types for the month of November 2025
-            vastai show invoices-v1 -i -it stripe bitpay transfers --start-date 2025-11-01 --end-date 2025-11-30
+            vastai invoice list-v1 -i -it stripe bitpay transfers --start-date 2025-11-01 --end-date 2025-11-30
 
             # Show the first 20 charges for only volumes and serverless instances between two dates, including all details and metadata
-            vastai show invoices-v1 -c --charge-type v s -s 2025-11-01 -e 2025-11-05 --format tree --verbose
+            vastai invoice list-v1 -c --charge-type v s -s 2025-11-01 -e 2025-11-05 --format tree --verbose
 
             # Get the next page of paginated invoices, limit to 50 per page  (note: type/date filters MUST match previous request for pagination to work)
-            vastai show invoices-v1 --invoices --limit 50 --next-token eyJ2YWx1ZXMiOiB7ImlkIjogMjUwNzgyMzR9LCAib3NfcGFnZSI6IDB9
+            vastai invoice list-v1 --invoices --limit 50 --next-token eyJ2YWx1ZXMiOiB7ImlkIjogMjUwNzgyMzR9LCAib3NfcGFnZSI6IDB9
 
             # Show the last 10 instance (only) charges over a 7 day period ending in 2025-12-25, sorted by latest charges first
-            vastai show invoices-v1 --charges -ct instance --end-date 2025-12-25 -l 10 --latest-first
+            vastai invoice list-v1 --charges -ct instance --end-date 2025-12-25 -l 10 --latest-first
     """)
 )
-def show__invoices_v1(args):
+def invoice__list_v1(args):
     output_lines = []
     try:
         from rich.prompt import Confirm
@@ -356,13 +360,14 @@ def show__invoices_v1(args):
 
 @parser.command(
     argument("-q", "--quiet", action="store_true", help="display information about user"),
-    usage="vastai show user [OPTIONS]",
+    aliases=hidden_aliases(["show user"]),
+    usage="vastai account show [OPTIONS]",
     help="Get current user data",
     epilog=deindent("""
         Shows stats for logged-in user. These include user balance, email, and ssh key. Does not show API key.
     """)
 )
-def show__user(args):
+def account__show(args):
     """
     Shows stats for logged-in user. Does not show API key.
 
@@ -383,7 +388,8 @@ def show__user(args):
 
 @parser.command(
     argument("--file", help="file path for params in json format", type=str),
-    usage="vastai set user --file FILE",
+    aliases=hidden_aliases(["set user"]),
+    usage="vastai account update --file FILE",
     help="Update user data from json file",
     epilog=deindent("""
 
@@ -410,7 +416,7 @@ def show__user(args):
     phone_number                    string
     """),
 )
-def set__user(args):
+def account__update(args):
     params = None
     with open(args.file, 'r') as file:
         params = json.load(file)
@@ -424,13 +430,14 @@ def set__user(args):
     argument("recipient", help="email (or id) of recipient account", type=str),
     argument("amount",    help="$dollars of credit to transfer ", type=float),
     argument("--skip",    help="skip confirmation", action="store_true", default=False),
-    usage="vastai transfer credit RECIPIENT AMOUNT",
+    aliases=hidden_aliases(["transfer credit"]),
+    usage="vastai account transfer-credit RECIPIENT AMOUNT",
     help="Transfer credits to another account",
     epilog=deindent("""
         Transfer (amount) credits to account with email (recipient).
     """),
 )
-def transfer__credit(args: argparse.Namespace):
+def account__transfer_credit(args: argparse.Namespace):
     url = apiurl(args, "/commands/transfer_credit/")
 
     if not args.skip:

@@ -26,7 +26,7 @@ from vast_cli.helpers import _get_gpu_names, _is_valid_region, _parse_region
 
 @parser.command(
     argument("query", help="Search query in simple query syntax (see below)", nargs="*", default=None),
-    usage="vastai search benchmarks [--help] [--api-key API_KEY] [--raw] <query>",
+    usage="vastai benchmark search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for benchmark results using custom query",
     epilog=deindent("""
         Query syntax:
@@ -44,7 +44,7 @@ from vast_cli.helpers import _get_gpu_names, _is_valid_region, _parse_region
         Examples:
 
             # search for benchmarks with score > 100 for llama2_70B model on 2 specific machines
-            vastai search benchmarks 'score > 100.0  model=llama2_70B  machine_id in [302,402]'
+            vastai benchmark search 'score > 100.0  model=llama2_70B  machine_id in [302,402]'
 
         Available fields:
 
@@ -62,7 +62,7 @@ from vast_cli.helpers import _get_gpu_names, _is_valid_region, _parse_region
     """),
     aliases=hidden_aliases(["search benchmarks"]),
 )
-def search__benchmarks(args):
+def benchmark__search(args):
     """Creates a query based on search parameters as in the examples above.
     :param argparse.Namespace args: should supply all the command-line options
     """
@@ -88,7 +88,7 @@ def search__benchmarks(args):
 
 @parser.command(
     argument("query", help="Search query in simple query syntax (see below)", nargs="*", default=None),
-    usage="vastai search invoices [--help] [--api-key API_KEY] [--raw] <query>",
+    usage="vastai invoice search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for invoices using custom query",
     epilog=deindent("""
         Query syntax:
@@ -140,7 +140,7 @@ def search__benchmarks(args):
     """),
     aliases=hidden_aliases(["search invoices"]),
 )
-def search__invoices(args):
+def invoice__search(args):
     """Creates a query based on search parameters as in the examples above.
     :param argparse.Namespace args: should supply all the command-line options
     """
@@ -176,7 +176,7 @@ def search__invoices(args):
     argument("--storage", type=float, default=5.0, help="Amount of storage to use for pricing, in GiB. default=5.0GiB"),
     argument("-o", "--order", type=str, help="Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'num_gpus,total_flops-'.  default='score-'", default='score-'),
     argument("query", help="Query to search for. default: 'external=false rentable=true verified=true', pass -n to ignore default", nargs="*", default=None),
-    usage="vastai search offers [--help] [--api-key API_KEY] [--raw] <query>",
+    usage="vastai offer search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for instance types using custom query",
     epilog=deindent("""
         Query syntax:
@@ -194,25 +194,25 @@ def search__invoices(args):
         Examples:
 
             # search for somewhat reliable single RTX 3090 instances, filter out any duplicates or offers that conflict with our existing stopped instances
-            vastai search offers 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=False'
+            vastai offer search 'reliability > 0.98 num_gpus=1 gpu_name=RTX_3090 rented=False'
 
             # search for datacenter gpus with minimal compute_cap and total_flops
-            vastai search offers 'compute_cap > 610 total_flops > 5 datacenter=True'
+            vastai offer search 'compute_cap > 610 total_flops > 5 datacenter=True'
 
             # search for reliable 4 gpu offers in Taiwan or Sweden
-            vastai search offers 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
+            vastai offer search 'reliability>0.99 num_gpus=4 geolocation in [TW,SE]'
 
             # search for reliable RTX 3090 or 4090 gpus NOT in China or Vietnam
-            vastai search offers 'reliability>0.99 gpu_name in ["RTX 4090", "RTX 3090"] geolocation notin [CN,VN]'
+            vastai offer search 'reliability>0.99 gpu_name in ["RTX 4090", "RTX 3090"] geolocation notin [CN,VN]'
 
             # search for machines with nvidia drivers 535.86.05 or greater (and various other options)
-            vastai search offers 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
+            vastai offer search 'disk_space>146 duration>24 gpu_ram>10 cuda_vers>=12.1 direct_port_count>=2 driver_version >= 535.86.05'
 
             # search for reliable machines with at least 4 gpus, unverified, order by num_gpus, allow conflicts
-            vastai search offers 'reliability > 0.99  num_gpus>=4 verified=False rented=any' -o 'num_gpus-'
+            vastai offer search 'reliability > 0.99  num_gpus>=4 verified=False rented=any' -o 'num_gpus-'
 
             # search for arm64 cpu architecture
-            vastai search offers 'cpu_arch=arm64'
+            vastai offer search 'cpu_arch=arm64'
 
         Available fields:
 
@@ -268,9 +268,9 @@ def search__invoices(args):
             verified:               bool      is the machine verified
             vms_enabled:            bool      is the machine a VM instance
     """),
-    aliases=hidden_aliases(["search instances"]),
+    aliases=hidden_aliases(["search offers", "search instances"]),
 )
-def search__offers(args):
+def offer__search(args):
     """Creates a query based on search parameters as in the examples above.
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -386,7 +386,7 @@ def search__offers(args):
 
 @parser.command(
     argument("query", help="Search query in simple query syntax (see below)", nargs="*", default=None),
-    usage="vastai search templates [--help] [--api-key API_KEY] [--raw] <query>",
+    usage="vastai template search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for template results using custom query",
     epilog=deindent("""
         Query syntax:
@@ -404,7 +404,7 @@ def search__offers(args):
         Examples:
 
             # search for somewhat reliable single RTX 3090 instances, filter out any duplicates or offers that conflict with our existing stopped instances
-            vastai search templates 'count_created > 100  creator_id in [38382,48982]'
+            vastai template search 'count_created > 100  creator_id in [38382,48982]'
 
         Available fields:
 
@@ -428,7 +428,7 @@ def search__offers(args):
     use_ssh                 bool       supports ssh (direct or proxy)    """),
     aliases=hidden_aliases(["search templates"]),
 )
-def search__templates(args):
+def template__search(args):
     """Creates a query based on search parameters as in the examples above.
     :param argparse.Namespace args: should supply all the command-line options
     """

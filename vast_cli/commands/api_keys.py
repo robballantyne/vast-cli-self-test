@@ -4,7 +4,7 @@ import os
 
 import requests
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -17,14 +17,15 @@ from vast_cli.config import APIKEY_FILE, APIKEY_FILE_HOME
     argument("--name", help="name of the api-key", type=str),
     argument("--permission_file", help="file path for json encoded permissions, see https://vast.ai/docs/cli/roles-and-permissions for more information", type=str),
     argument("--key_params", help="optional wildcard key params for advanced keys", type=str),
-    usage="vastai create api-key --name NAME --permission_file PERMISSIONS",
+    aliases=hidden_aliases(["create api-key"]),
+    usage="vastai api-key create --name NAME --permission_file PERMISSIONS",
     help="Create a new api-key with restricted permissions. Can be sent to other users and teammates",
     epilog=deindent("""
         In order to create api keys you must understand how permissions must be sent via json format.
         You can find more information about permissions here: https://vast.ai/docs/cli/roles-and-permissions
     """)
 )
-def create__api_key(args):
+def api_key__create(args):
     try:
         url = apiurl(args, "/auth/apikeys/")
         permissions = load_permissions_from_file(args.permission_file)
@@ -41,10 +42,11 @@ def create__api_key(args):
 
 @parser.command(
     argument("id", help="id of apikey to remove", type=int),
-    usage="vastai delete api-key ID",
+    aliases=hidden_aliases(["delete api-key"]),
+    usage="vastai api-key delete ID",
     help="Remove an api-key",
 )
-def delete__api_key(args):
+def api_key__delete(args):
     url = apiurl(args, "/auth/apikeys/{id}/".format(id=args.id))
     r = http_del(args, url, headers=state.headers)
     r.raise_for_status()
@@ -52,10 +54,11 @@ def delete__api_key(args):
 
 
 @parser.command(
-    usage="vastai reset api-key",
+    aliases=hidden_aliases(["reset api-key"]),
+    usage="vastai api-key reset",
     help="Reset your api-key (get new key from website)",
 )
-def reset__api_key(args):
+def api_key__reset(args):
     """Caution: a bad API key will make it impossible to connect to the servers.
     """
     #url = apiurl(args, "/users/current/reset-apikey/", {"owner": "me"})
@@ -71,10 +74,11 @@ def reset__api_key(args):
 
 @parser.command(
     argument("new_api_key", help="Api key to set as currently logged in user"),
-    usage="vastai set api-key APIKEY",
+    aliases=hidden_aliases(["set api-key"]),
+    usage="vastai api-key set APIKEY",
     help="Set api-key (get your api-key from the console/CLI)",
 )
-def set__api_key(args):
+def api_key__set(args):
     """Caution: a bad API key will make it impossible to connect to the servers.
     :param argparse.Namespace args: should supply all the command-line options
     """
@@ -89,20 +93,22 @@ def set__api_key(args):
 
 @parser.command(
     argument("id", help="id of apikey to get", type=int),
-    usage="vastai show api-key",
+    aliases=hidden_aliases(["show api-key"]),
+    usage="vastai api-key show",
     help="Show an api-key",
 )
-def show__api_key(args):
+def api_key__show(args):
     url = apiurl(args, "/auth/apikeys/{id}/".format(id=args.id))
     r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
     print(r.json())
 
 @parser.command(
-    usage="vastai show api-keys",
+    aliases=hidden_aliases(["show api-keys"]),
+    usage="vastai api-key list",
     help="List your api-keys associated with your account",
 )
-def show__api_keys(args):
+def api_key__list(args):
     url = apiurl(args, "/auth/apikeys/")
     r = http_get(args, url, headers=state.headers)
     r.raise_for_status()

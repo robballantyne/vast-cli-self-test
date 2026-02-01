@@ -5,7 +5,7 @@ import json
 
 import requests
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -28,15 +28,16 @@ from vast_cli.config import server_url_default
     argument("--cold_mult",   help="[NOTE: this field isn't currently used at the workergroup level]cold/stopped instance capacity target as multiple of hot capacity target (default 2.0)", type=float),
     argument("--cold_workers",   help="min number of workers to keep 'cold' for this workergroup", type=int),
     argument("--auto_instance", help=argparse.SUPPRESS, type=str, default="prod"),
+    aliases=hidden_aliases(["create workergroup"]),
     usage="vastai workergroup create [OPTIONS]",
     help="Create a new autoscale group",
     epilog=deindent("""
         Create a new autoscaling group to manage a pool of worker instances.
 
-        Example: vastai create workergroup --template_hash HASH  --endpoint_name "LLama" --test_workers 5
+        Example: vastai workergroup create --template_hash HASH  --endpoint_name "LLama" --test_workers 5
         """),
 )
-def create__workergroup(args):
+def workergroup__create(args):
     url = apiurl(args, "/autojobs/" )
 
     # if args.launch_args_dict:
@@ -79,15 +80,16 @@ def create__workergroup(args):
     argument("--endpoint_name", help="deployment endpoint name (allows multiple autoscale groups to share same deployment endpoint)", type=str),
     argument("--auto_instance", help=argparse.SUPPRESS, type=str, default="prod"),
 
-    usage="vastai create endpoint [OPTIONS]",
+    aliases=hidden_aliases(["create endpoint"]),
+    usage="vastai endpoint create [OPTIONS]",
     help="Create a new endpoint group",
     epilog=deindent("""
         Create a new endpoint group to manage many autoscaling groups
 
-        Example: vastai create endpoint --target_util 0.9 --cold_mult 2.0 --endpoint_name "LLama"
+        Example: vastai endpoint create --target_util 0.9 --cold_mult 2.0 --endpoint_name "LLama"
     """),
 )
-def create__endpoint(args):
+def endpoint__create(args):
     url = apiurl(args, "/endptjobs/" )
 
     json_blob = {"client_id": "me", "min_load": args.min_load, "min_cold_load":args.min_cold_load, "target_util": args.target_util, "cold_mult": args.cold_mult, "cold_workers" : args.cold_workers, "max_workers" : args.max_workers, "endpoint_name": args.endpoint_name, "autoscaler_instance": args.auto_instance}
@@ -111,14 +113,15 @@ def create__endpoint(args):
 
 @parser.command(
     argument("id", help="id of group to delete", type=int),
-    usage="vastai delete workergroup ID ",
+    aliases=hidden_aliases(["delete workergroup"]),
+    usage="vastai workergroup delete ID",
     help="Delete a workergroup group",
     epilog=deindent("""
         Note that deleting a workergroup doesn't automatically destroy all the instances that are associated with your workergroup.
-        Example: vastai delete workergroup 4242
+        Example: vastai workergroup delete 4242
     """),
 )
-def delete__workergroup(args):
+def workergroup__delete(args):
     id  = args.id
     url = apiurl(args, f"/autojobs/{id}/" )
     json_blob = {"client_id": "me", "autojob_id": args.id}
@@ -140,13 +143,14 @@ def delete__workergroup(args):
 
 @parser.command(
     argument("id", help="id of endpoint group to delete", type=int),
-    usage="vastai delete endpoint ID ",
+    aliases=hidden_aliases(["delete endpoint"]),
+    usage="vastai endpoint delete ID",
     help="Delete an endpoint group",
     epilog=deindent("""
-        Example: vastai delete endpoint 4242
+        Example: vastai endpoint delete 4242
     """),
 )
-def delete__endpoint(args):
+def endpoint__delete(args):
     id  = args.id
     url = apiurl(args, f"/endptjobs/{id}/" )
     json_blob = {"client_id": "me", "endptjob_id": args.id}
@@ -171,13 +175,14 @@ def delete__endpoint(args):
     argument("id", help="id of endpoint group to fetch logs from", type=int),
     argument("--level", help="log detail level (0 to 3)", type=int, default=1),
     argument("--tail", help="", type=int, default=None),
-    usage="vastai get endpt-logs ID [--api-key API_KEY]",
+    aliases=hidden_aliases(["get endpt-logs"]),
+    usage="vastai endpoint logs ID [--api-key API_KEY]",
     help="Fetch logs for a specific serverless endpoint group",
     epilog=deindent("""
-        Example: vastai get endpt-logs 382
+        Example: vastai endpoint logs 382
     """),
 )
-def get__endpt_logs(args):
+def endpoint__logs(args):
     #url = apiurl(args, "/endptjobs/" )
     if args.url == server_url_default:
         args.url = None
@@ -213,13 +218,14 @@ def get__endpt_logs(args):
     argument("id", help="id of endpoint group to fetch logs from", type=int),
     argument("--level", help="log detail level (0 to 3)", type=int, default=1),
     argument("--tail", help="", type=int, default=None),
-    usage="vastai get wrkgrp-logs ID [--api-key API_KEY]",
+    aliases=hidden_aliases(["get wrkgrp-logs"]),
+    usage="vastai workergroup logs ID [--api-key API_KEY]",
     help="Fetch logs for a specific serverless worker group group",
     epilog=deindent("""
-        Example: vastai get endpt-logs 382
+        Example: vastai workergroup logs 382
     """),
 )
-def get__wrkgrp_logs(args):
+def workergroup__logs(args):
     #url = apiurl(args, "/endptjobs/" )
     if args.url == server_url_default:
         args.url = None
@@ -253,13 +259,14 @@ def get__wrkgrp_logs(args):
 
 
 @parser.command(
-    usage="vastai show workergroups [--api-key API_KEY]",
+    aliases=hidden_aliases(["show workergroups"]),
+    usage="vastai workergroup list [--api-key API_KEY]",
     help="Display user's current workergroups",
     epilog=deindent("""
-        Example: vastai show workergroups
+        Example: vastai workergroup list
     """),
 )
-def show__workergroups(args):
+def workergroup__list(args):
     url = apiurl(args, "/autojobs/" )
     json_blob = {"client_id": "me", "api_key": args.api_key}
     if (args.explain):
@@ -282,13 +289,14 @@ def show__workergroups(args):
             print(rj["msg"]);
 
 @parser.command(
-    usage="vastai show endpoints [--api-key API_KEY]",
+    aliases=hidden_aliases(["show endpoints"]),
+    usage="vastai endpoint list [--api-key API_KEY]",
     help="Display user's current endpoint groups",
     epilog=deindent("""
-        Example: vastai show endpoints
+        Example: vastai endpoint list
     """),
 )
-def show__endpoints(args):
+def endpoint__list(args):
     url = apiurl(args, "/endptjobs/" )
     json_blob = {"client_id": "me", "api_key": args.api_key}
     if (args.explain):
@@ -326,13 +334,14 @@ def show__endpoints(args):
     argument("--launch_args",   help="launch args  string for create instance  ex: \"--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/public.vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64\"", type=str),
     argument("--endpoint_name",   help="deployment endpoint name (allows multiple workergroups to share same deployment endpoint)", type=str),
     argument("--endpoint_id",   help="deployment endpoint id (allows multiple workergroups to share same deployment endpoint)", type=int),
-    usage="vastai update workergroup WORKERGROUP_ID --endpoint_id ENDPOINT_ID [options]",
+    aliases=hidden_aliases(["update workergroup"]),
+    usage="vastai workergroup update WORKERGROUP_ID --endpoint_id ENDPOINT_ID [options]",
     help="Update an existing autoscale group",
     epilog=deindent("""
-        Example: vastai update workergroup 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --search_params \"gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64\" --launch_args \"--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/public.vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64\" --gpu_ram 32.0 --endpoint_name "LLama" --endpoint_id 2
+        Example: vastai workergroup update 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --search_params \"gpu_ram>=23 num_gpus=2 gpu_name=RTX_4090 inet_down>200 direct_port_count>2 disk_space>=64\" --launch_args \"--onstart onstart_wget.sh  --env '-e ONSTART_PATH=https://s3.amazonaws.com/public.vast.ai/onstart_OOBA.sh' --image atinoda/text-generation-webui:default-nightly --disk 64\" --gpu_ram 32.0 --endpoint_name "LLama" --endpoint_id 2
     """),
 )
-def update__workergroup(args):
+def workergroup__update(args):
     id  = args.id
     url = apiurl(args, f"/autojobs/{id}/" )
     if args.no_default:
@@ -369,13 +378,14 @@ def update__workergroup(args):
     argument("--cold_workers", help="min number of workers to keep 'cold' when you have no load (default 5)", type=int),
     argument("--max_workers", help="max number of workers your endpoint group can have (default 20)", type=int),
     argument("--endpoint_name",   help="deployment endpoint name (allows multiple workergroups to share same deployment endpoint)", type=str),
-    usage="vastai update endpoint ID [OPTIONS]",
+    aliases=hidden_aliases(["update endpoint"]),
+    usage="vastai endpoint update ID [OPTIONS]",
     help="Update an existing endpoint group",
     epilog=deindent("""
-        Example: vastai update endpoint 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --endpoint_name "LLama"
+        Example: vastai endpoint update 4242 --min_load 100 --target_util 0.9 --cold_mult 2.0 --endpoint_name "LLama"
     """),
 )
-def update__endpoint(args):
+def endpoint__update(args):
     id  = args.id
     url = apiurl(args, f"/endptjobs/{id}/" )
     json_blob = {"client_id": "me", "endptjob_id": args.id, "min_load": args.min_load, "min_cold_load":args.min_cold_load,"target_util": args.target_util, "cold_mult": args.cold_mult, "cold_workers": args.cold_workers, "max_workers" : args.max_workers, "endpoint_name": args.endpoint_name, "endpoint_state": args.endpoint_state, "autoscaler_instance":args.auto_instance}

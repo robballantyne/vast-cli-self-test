@@ -712,8 +712,8 @@ def destroy_instance_silent(id, args):
 
 
 def instance_exist(instance_id, api_key, args):
-    # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands.instances import show__instance
+    # Import here to avoid circular imports - instance__show is a command function
+    from vast_cli.commands.instances import instance__show
 
     if not hasattr(args, 'debugging'):
         args.debugging = False
@@ -731,7 +731,7 @@ def instance_exist(instance_id, api_key, args):
         debugging=args.debugging
     )
     try:
-        instance_info = show__instance(show_args)
+        instance_info = instance__show(show_args)
 
         # Empty list or None means instance doesn't exist - return False without error
         if not instance_info:
@@ -786,8 +786,8 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
             - bool: `True` if the test was successful, `False` otherwise.
             - str: Reason for failure if the test was not successful, empty string otherwise.
     """
-    # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands.instances import show__instance
+    # Import here to avoid circular imports - instance__show is a command function
+    from vast_cli.commands.instances import instance__show
 
     # Temporarily disable SSL warnings
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -798,7 +798,7 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
         args.debugging = False
 
     def is_instance(instance_id):
-        """Check instance status via show__instance."""
+        """Check instance status via instance__show."""
         show_args = argparse.Namespace(
             id=instance_id,
             explain=False,
@@ -809,9 +809,9 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
             debugging=args.debugging,
         )
         try:
-            instance_info = show__instance(show_args)
+            instance_info = instance__show(show_args)
             if args.debugging:
-                debug_print(args, f"is_instance(): Output from vast show instance: {instance_info}")
+                debug_print(args, f"is_instance(): Output from vast instance show: {instance_info}")
 
             if not instance_info or not isinstance(instance_info, dict):
                 if args.debugging:
@@ -962,8 +962,8 @@ def check_requirements(machine_id, api_key, args):
             - bool: `True` if the machine meets all requirements, `False` otherwise.
             - list: A list of reasons why the machine does not meet the requirements.
     """
-    # Import here to avoid circular imports - search__offers is a command function
-    from vast_cli.commands.search import search__offers
+    # Import here to avoid circular imports - offer__search is a command function
+    from vast_cli.commands.search import offer__search
 
     unmet_reasons = []
 
@@ -986,10 +986,10 @@ def check_requirements(machine_id, api_key, args):
     )
 
     try:
-        # Call search__offers and capture the return value directly
-        offers = search__offers(search_args)
+        # Call offer__search and capture the return value directly
+        offers = offer__search(search_args)
         if args.debugging:
-            debug_print(args, "Captured offers from search__offers:", offers)
+            debug_print(args, "Captured offers from offer__search:", offers)
 
         if not offers:
             unmet_reasons.append(f"Machine ID {machine_id} not found or not rentable.")
@@ -1078,8 +1078,8 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
     Waits for an instance to reach a running state and monitors its status for errors.
 
     """
-    # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands.instances import show__instance
+    # Import here to avoid circular imports - instance__show is a command function
+    from vast_cli.commands.instances import instance__show
 
     if not hasattr(args, 'debugging'):
         args.debugging = False
@@ -1101,8 +1101,8 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
 
     while time.time() - start_time < timeout:
         try:
-            # Directly call show__instance and capture the return value
-            instance_info = show__instance(show_args)
+            # Directly call instance__show and capture the return value
+            instance_info = instance__show(show_args)
 
             if not instance_info:
                 progress_print(args, f"No information returned for instance {instance_id}. Retrying...")

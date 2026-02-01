@@ -4,7 +4,7 @@ import json
 
 import requests
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -16,20 +16,21 @@ from vast_cli.query.fields import offers_fields, offers_alias, offers_mult
 
 @parser.command(
     *get_template_arguments(),
-    usage="vastai create template",
+    aliases=hidden_aliases(["create template"]),
+    usage="vastai template create",
     help="Create a new template",
     epilog=deindent("""
         Create a template that can be used to create instances with
 
         Example:
-            vastai create template --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
+            vastai template create --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
                                     --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'"
                                     --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash'
                                     --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False"
                                     --disk_space 8.0 --ssh --direct
     """)
 )
-def create__template(args):
+def template__create(args):
     # url = apiurl(args, f"/users/0/templates/")
     url = apiurl(args, f"/template/")
     jup_direct = args.jupyter and args.direct
@@ -88,15 +89,16 @@ def create__template(args):
 @parser.command(
     argument("--template-id", help="Template ID of Template to Delete", type=int),
     argument("--hash-id", help="Hash ID of Template to Delete", type=str),
-    usage="vastai delete template [--template-id <id> | --hash-id <hash_id>]",
+    aliases=hidden_aliases(["delete template"]),
+    usage="vastai template delete [--template-id <id> | --hash-id <hash_id>]",
     help="Delete a Template",
     epilog=deindent("""
         Note: Deleting a template only removes the user's replationship to a template. It does not get destroyed
-        Example: vastai delete template --template-id 12345
-        Example: vastai delete template --hash-id 49c538d097ad6437413b83711c9f61e8
+        Example: vastai template delete --template-id 12345
+        Example: vastai template delete --hash-id 49c538d097ad6437413b83711c9f61e8
     """),
 )
-def delete__template(args):
+def template__delete(args):
     url = apiurl(args, f"/template/" )
 
     if args.hash_id:
@@ -130,20 +132,21 @@ def delete__template(args):
 @parser.command(
     argument("HASH_ID", help="hash id of the template", type=str),
     *get_template_arguments(),
-    usage="vastai update template HASH_ID",
+    aliases=hidden_aliases(["update template"]),
+    usage="vastai template update HASH_ID",
     help="Update an existing template",
     epilog=deindent("""
         Update a template
 
         Example:
-            vastai update template c81e7ab0e928a508510d1979346de10d --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
+            vastai template update c81e7ab0e928a508510d1979346de10d --name "tgi-llama2-7B-quantized" --image "ghcr.io/huggingface/text-generation-inference:1.0.3"
                                     --env "-p 3000:3000 -e MODEL_ARGS='--model-id TheBloke/Llama-2-7B-chat-GPTQ --quantize gptq'"
                                     --onstart-cmd 'wget -O - https://raw.githubusercontent.com/vast-ai/vast-pyworker/main/scripts/launch_tgi.sh | bash'
                                     --search_params "gpu_ram>=23 num_gpus=1 gpu_name=RTX_3090 inet_down>128 direct_port_count>3 disk_space>=192 driver_version>=535086005 rented=False"
                                     --disk 8.0 --ssh --direct
     """)
 )
-def update__template(args):
+def template__update(args):
     url = apiurl(args, f"/template/")
     jup_direct = args.jupyter and args.direct
     ssh_direct = args.ssh and args.direct

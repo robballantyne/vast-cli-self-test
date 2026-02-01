@@ -3,7 +3,7 @@
 import json
 import argparse
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -18,17 +18,18 @@ from vast_cli.query.fields import ipaddr_fields, audit_log_fields, user_fields
     argument("--username", help="username to use for login", type=str),
     argument("--password", help="password to use for login", type=str),
     argument("--type", help="host/client", type=str),
-    usage="vastai create subaccount --email EMAIL --username USERNAME --password PASSWORD --type TYPE",
+    aliases=hidden_aliases(["create subaccount"]),
+    usage="vastai subaccount create --email EMAIL --username USERNAME --password PASSWORD --type TYPE",
     help="Create a subaccount",
     epilog=deindent("""
        Creates a new account that is considered a child of your current account as defined via the API key.
 
-       vastai create subaccount --email bob@gmail.com --username bob --password password --type host
+       vastai subaccount create --email bob@gmail.com --username bob --password password --type host
 
-       vastai create subaccount --email vast@gmail.com --username vast --password password --type host
+       vastai subaccount create --email vast@gmail.com --username vast --password password --type host
     """),
 )
-def create__subaccount(args):
+def subaccount__create(args):
     """Creates a new account that is considered a child of your current account as defined via the API key.
     """
     # Default value for host_only, can adjust based on expected default behavior
@@ -66,7 +67,8 @@ def create__subaccount(args):
 
 @parser.command(
     argument("--team_name", help="name of the team", type=str),
-    usage="vastai create-team --team_name TEAM_NAME",
+    aliases=hidden_aliases(["create-team"]),
+    usage="vastai team create --team_name TEAM_NAME",
     help="Create a new team",
     epilog=deindent("""
          Creates a new team under your account.
@@ -93,7 +95,7 @@ def create__subaccount(args):
     """)
 )
 
-def create__team(args):
+def team__create(args):
     url = apiurl(args, "/team/")
     r = http_post(args, url, headers=state.headers, json={"team_name": args.team_name})
     r.raise_for_status()
@@ -102,14 +104,15 @@ def create__team(args):
 @parser.command(
     argument("--name", help="name of the role", type=str),
     argument("--permissions", help="file path for json encoded permissions, look in the docs for more information", type=str),
-    usage="vastai create team-role --name NAME --permissions PERMISSIONS",
+    aliases=hidden_aliases(["create team-role"]),
+    usage="vastai team-role create --name NAME --permissions PERMISSIONS",
     help="Add a new role to your team",
     epilog=deindent("""
         Creating a new team role involves understanding how permissions must be sent via json format.
         You can find more information about permissions here: https://vast.ai/docs/cli/roles-and-permissions
     """)
 )
-def create__team_role(args):
+def team_role__create(args):
     url = apiurl(args, "/team/roles/")
     permissions = load_permissions_from_file(args.permissions)
     r = http_post(args, url, headers=state.headers, json={"name": args.name, "permissions": permissions})
@@ -117,10 +120,11 @@ def create__team_role(args):
     print(r.json())
 
 @parser.command(
-    usage="vastai destroy team",
+    aliases=hidden_aliases(["destroy team"]),
+    usage="vastai team destroy",
     help="Destroy your team",
 )
-def destroy__team(args):
+def team__destroy(args):
     url = apiurl(args, "/team/")
     r = http_del(args, url, headers=state.headers)
     r.raise_for_status()
@@ -129,10 +133,11 @@ def destroy__team(args):
 @parser.command(
     argument("--email", help="email of user to be invited", type=str),
     argument("--role", help="role of user to be invited", type=str),
-    usage="vastai invite member --email EMAIL --role ROLE",
+    aliases=hidden_aliases(["invite member"]),
+    usage="vastai member invite --email EMAIL --role ROLE",
     help="Invite a team member",
 )
-def invite__member(args):
+def member__invite(args):
     url = apiurl(args, "/team/invite/", query_args={"email": args.email, "role": args.role})
     r = http_post(args, url, headers=state.headers)
     r.raise_for_status()
@@ -145,10 +150,11 @@ def invite__member(args):
 
 @parser.command(
     argument("id", help="id of user to remove", type=int),
-    usage="vastai remove member ID",
+    aliases=hidden_aliases(["remove member"]),
+    usage="vastai member remove ID",
     help="Remove a team member",
 )
-def remove__member(args):
+def member__remove(args):
     url = apiurl(args, "/team/members/{id}/".format(id=args.id))
     r = http_del(args, url, headers=state.headers)
     r.raise_for_status()
@@ -156,10 +162,11 @@ def remove__member(args):
 
 @parser.command(
     argument("NAME", help="name of the role", type=str),
-    usage="vastai remove team-role NAME",
+    aliases=hidden_aliases(["remove team-role"]),
+    usage="vastai team-role remove NAME",
     help="Remove a role from your team",
 )
-def remove__team_role(args):
+def team_role__remove(args):
     url = apiurl(args, "/team/roles/{id}/".format(id=args.NAME))
     r = http_del(args, url, headers=state.headers)
     r.raise_for_status()
@@ -167,10 +174,11 @@ def remove__team_role(args):
 
 @parser.command(
     argument("-q", "--quiet", action="store_true", help="display subaccounts from current user"),
-    usage="vastai show subaccounts [OPTIONS]",
+    aliases=hidden_aliases(["show subaccounts"]),
+    usage="vastai subaccount list [OPTIONS]",
     help="Get current subaccounts"
 )
-def show__subaccounts(args):
+def subaccount__list(args):
     """
     Shows stats for logged-in user. Does not show API key.
 
@@ -187,10 +195,11 @@ def show__subaccounts(args):
         display_table(rows, user_fields)
 
 @parser.command(
-    usage="vastai show members",
+    aliases=hidden_aliases(["show members"]),
+    usage="vastai member list",
     help="Show your team members",
 )
-def show__members(args):
+def member__list(args):
     url = apiurl(args, "/team/members/")
     r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
@@ -202,20 +211,22 @@ def show__members(args):
 
 @parser.command(
     argument("NAME", help="name of the role", type=str),
-    usage="vastai show team-role NAME",
+    aliases=hidden_aliases(["show team-role"]),
+    usage="vastai team-role show NAME",
     help="Show your team role",
 )
-def show__team_role(args):
+def team_role__show(args):
     url = apiurl(args, "/team/roles/{id}/".format(id=args.NAME))
     r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
     print(json.dumps(r.json(), indent=1, sort_keys=True))
 
 @parser.command(
-    usage="vastai show team-roles",
+    aliases=hidden_aliases(["show team-roles"]),
+    usage="vastai team-role list",
     help="Show roles for a team"
 )
-def show__team_roles(args):
+def team_role__list(args):
     url = apiurl(args, "/team/roles-full/")
     r = http_get(args, url, headers=state.headers)
     r.raise_for_status()
@@ -229,10 +240,11 @@ def show__team_roles(args):
     argument("id", help="id of the role", type=int),
     argument("--name", help="name of the template", type=str),
     argument("--permissions", help="file path for json encoded permissions, look in the docs for more information", type=str),
-    usage="vastai update team-role ID --name NAME --permissions PERMISSIONS",
+    aliases=hidden_aliases(["update team-role"]),
+    usage="vastai team-role update ID --name NAME --permissions PERMISSIONS",
     help="Update an existing team role",
 )
-def update__team_role(args):
+def team_role__update(args):
     url = apiurl(args, "/team/roles/{id}/".format(id=args.id))
     permissions = load_permissions_from_file(args.permissions)
     r = http_put(args, url,  headers=state.headers, json={"name": args.name, "permissions": permissions})
@@ -244,10 +256,11 @@ def update__team_role(args):
 
 
 @parser.command(
-    usage="vastai show ipaddrs [--api-key API_KEY] [--raw]",
+    aliases=hidden_aliases(["show ipaddrs"]),
+    usage="vastai account ipaddrs [--api-key API_KEY] [--raw]",
     help="Display user's history of ip addresses"
 )
-def show__ipaddrs(args):
+def account__ipaddrs(args):
     """
     Shows the history of ip address accesses to console.vast.ai endpoints
 
@@ -267,10 +280,11 @@ def show__ipaddrs(args):
 
 @parser.command(
     argument("id", help="machine id", type=int),
-    usage="vastai reports ID",
+    aliases=hidden_aliases(["reports"]),
+    usage="vastai machine reports ID",
     help="Get the user reports for a given machine",
 )
-def reports(args):
+def machine__reports(args):
     """
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
@@ -290,10 +304,11 @@ def reports(args):
 
 
 @parser.command(
-    usage="vastai show audit-logs [--api-key API_KEY] [--raw]",
+    aliases=hidden_aliases(["show audit-logs"]),
+    usage="vastai account audit-logs [--api-key API_KEY] [--raw]",
     help="Display account's history of important actions"
 )
-def show__audit_logs(args):
+def account__audit_logs(args):
     """
     Shows the history of ip address accesses to console.vast.ai endpoints
 

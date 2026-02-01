@@ -3,7 +3,7 @@
 import time
 import argparse
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -26,14 +26,15 @@ from vast_cli.validation.validators import strip_strings
     argument("-s", "--size",
              help="size in GB of volume. Default %(default)s GB.", default=15, type=float),
     argument("-n", "--name", help="Optional name of volume.", type=str),
-    usage="vastai create volume ID [options]",
+    aliases=hidden_aliases(["create volume"]),
+    usage="vastai volume create ID [options]",
     help="Create a new volume",
     epilog=deindent("""
         Creates a volume from an offer ID (which is returned from "search volumes"). Each offer ID can be used to create multiple volumes,
         provided the size of all volumes does not exceed the size of the offer.
     """)
 )
-def create__volume(args: argparse.Namespace):
+def volume__create(args: argparse.Namespace):
 
     json_blob ={
         "size": int(args.size),
@@ -60,14 +61,15 @@ def create__volume(args: argparse.Namespace):
     argument("-s", "--size",
              help="size in GB of network volume. Default %(default)s GB.", default=15, type=float),
     argument("-n", "--name", help="Optional name of network volume.", type=str),
-    usage="vastai create network volume ID [options]",
+    aliases=hidden_aliases(["create network-volume"]),
+    usage="vastai network-volume create ID [options]",
     help="Create a new network volume",
     epilog=deindent("""
         Creates a network volume from an offer ID (which is returned from "search network volumes"). Each offer ID can be used to create multiple volumes,
         provided the size of all volumes does not exceed the size of the offer.
     """)
 )
-def create__network_volume(args: argparse.Namespace):
+def network_volume__create(args: argparse.Namespace):
 
     json_blob ={
         "size": int(args.size),
@@ -91,13 +93,14 @@ def create__network_volume(args: argparse.Namespace):
 
 @parser.command(
     argument("id", help="id of volume contract", type=int),
-    usage="vastai delete volume ID",
+    aliases=hidden_aliases(["delete volume"]),
+    usage="vastai volume delete ID",
     help="Delete a volume",
     epilog=deindent("""
         Deletes volume with the given ID. All instances using the volume must be destroyed before the volume can be deleted.
     """)
 )
-def delete__volume(args: argparse.Namespace):
+def volume__delete(args: argparse.Namespace):
     url = apiurl(args, "/volumes/", query_args={"id": args.id})
     r = http_del(args, url, headers=state.headers)
     r.raise_for_status()
@@ -113,7 +116,8 @@ def delete__volume(args: argparse.Namespace):
     argument("--storage", type=float, default=1.0, help="Amount of storage to use for pricing, in GiB. default=1.0GiB"),
     argument("-o", "--order", type=str, help="Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'disk_space,inet_up-'.  default='score-'", default='score-'),
     argument("query", help="Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default", nargs="*", default=None),
-    usage="vastai search volumes [--help] [--api-key API_KEY] [--raw] <query>",
+    aliases=hidden_aliases(["search volumes"]),
+    usage="vastai volume search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for volume offers using custom query",
     epilog=deindent("""
         Query syntax:
@@ -131,7 +135,7 @@ def delete__volume(args: argparse.Namespace):
         Examples:
 
             # search for volumes with greater than 50GB of available storage and greater than 500 Mb/s upload and download speed
-            vastai search volumes "disk_space>50 inet_up>500 inet_down>500"
+            vastai volume search "disk_space>50 inet_up>500 inet_down>500"
 
         Available fields:
 
@@ -162,7 +166,7 @@ def delete__volume(args: argparse.Namespace):
             verified:               bool      is the machine verified
     """),
 )
-def search__volumes(args: argparse.Namespace):
+def volume__search(args: argparse.Namespace):
     try:
 
         if args.no_default:
@@ -226,7 +230,8 @@ def search__volumes(args: argparse.Namespace):
     argument("--storage", type=float, default=1.0, help="Amount of storage to use for pricing, in GiB. default=1.0GiB"),
     argument("-o", "--order", type=str, help="Comma-separated list of fields to sort on. postfix field with - to sort desc. ex: -o 'disk_space,inet_up-'.  default='score-'", default='score-'),
     argument("query", help="Query to search for. default: 'external=false verified=true disk_space>=1', pass -n to ignore default", nargs="*", default=None),
-    usage="vastai search network volumes [--help] [--api-key API_KEY] [--raw] <query>",
+    aliases=hidden_aliases(["search network-volumes"]),
+    usage="vastai network-volume search [--help] [--api-key API_KEY] [--raw] <query>",
     help="Search for network volume offers using custom query",
     epilog=deindent("""
         Query syntax:
@@ -244,7 +249,7 @@ def search__volumes(args: argparse.Namespace):
         Examples:
 
             # search for volumes with greater than 50GB of available storage and greater than 500 Mb/s upload and download speed
-            vastai search volumes "disk_space>50 inet_up>500 inet_down>500"
+            vastai network-volume search "disk_space>50 inet_up>500 inet_down>500"
 
         Available fields:
 
@@ -259,7 +264,7 @@ def search__volumes(args: argparse.Namespace):
             verified:               bool      is the machine verified
     """),
 )
-def search__network_volumes(args: argparse.Namespace):
+def network_volume__search(args: argparse.Namespace):
     try:
 
         if args.no_default:
@@ -318,13 +323,14 @@ def search__network_volumes(args: argparse.Namespace):
 
 @parser.command(
     argument("-t", "--type", help="volume type to display. Default to all. Possible values are \"local\", \"all\", \"network\"", type=str, default="all"),
-    usage="vastai show volumes [OPTIONS]",
+    aliases=hidden_aliases(["show volumes"]),
+    usage="vastai volume list [OPTIONS]",
     help="Show stats on owned volumes.",
     epilog=deindent("""
         Show stats on owned volumes
     """)
 )
-def show__volumes(args: argparse.Namespace):
+def volume__list(args: argparse.Namespace):
     types = {
         "local": "local_volume",
         "network": "network_volume",

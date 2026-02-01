@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl, apiheaders
@@ -147,7 +147,8 @@ def stop_instance(id, args):
     argument("--mount-path", help="The path to the volume from within the new instance container. e.g. /root/volume", type=str),
     argument("--volume-label", help="(optional) A name to give the new volume. Only usable with --create-volume", type=str),
 
-    usage="vastai create instance ID [OPTIONS] [--args ...]",
+    aliases=hidden_aliases(["create instance"]),
+    usage="vastai instance create ID [OPTIONS] [--args ...]",
     help="Create a new instance",
     epilog=deindent("""
         Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/
@@ -162,26 +163,26 @@ def stop_instance(id, args):
         Examples:
 
         # create an on-demand instance with the PyTorch (cuDNN Devel) template and 64GB of disk
-        vastai create instance 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64
+        vastai instance create 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64
 
         # create an on-demand instance with the pytorch/pytorch image, 40GB of disk, open 8081 udp, direct ssh, set hostname to billybob, and a small onstart script
-        vastai create instance 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:8081/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
+        vastai instance create 6995713 --image pytorch/pytorch --disk 40 --env '-p 8081:8081/udp -h billybob' --ssh --direct --onstart-cmd "env | grep _ >> /etc/environment; echo 'starting up'";
 
         # create an on-demand instance with the bobsrepo/pytorch:latest image, 20GB of disk, open 22, 8080, jupyter ssh, and set some env variables
-        vastai create instance 384827  --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
+        vastai instance create 384827  --image bobsrepo/pytorch:latest --login '-u bob -p 9d8df!fd89ufZ docker.io' --jupyter --direct --env '-e TZ=PDT -e XNAME=XX4 -p 22:22 -p 8080:8080' --disk 20
 
         # create an on-demand instance with the pytorch/pytorch image, 40GB of disk, override the entrypoint to bash and pass bash a simple command to keep the instance running. (args launch without ssh/jupyter)
-        vastai create instance 5801802 --image pytorch/pytorch --disk 40 --onstart-cmd 'bash' --args -c 'echo hello; sleep infinity;'
+        vastai instance create 5801802 --image pytorch/pytorch --disk 40 --onstart-cmd 'bash' --args -c 'echo hello; sleep infinity;'
 
         # create an interruptible (spot) instance with the PyTorch (cuDNN Devel) template, 64GB of disk, and a bid price of $0.10/hr
-        vastai create instance 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64 --bid_price 0.1
+        vastai instance create 384826 --template_hash 661d064bbda1f2a133816b6d55da07c3 --disk 64 --bid_price 0.1
 
         Return value:
         Returns a json reporting the instance ID of the newly created instance:
         {'success': True, 'new_contract': 7835610}
     """),
 )
-def create__instance(args: argparse.Namespace):
+def instance__create(args: argparse.Namespace):
     """Performs the same action as pressing the "RENT" button on the website at https://console.vast.ai/create/.
 
     :param argparse.Namespace args: Namespace with many fields relevant to the endpoint.
@@ -253,14 +254,15 @@ def create__instance(args: argparse.Namespace):
     argument("--end_date", type=str, default=default_end_date(), help="End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)"),
     argument("--day", type=parse_day_cron_style, help="Day of week you want scheduled job to run on (0-6, where 0=Sunday) or \"*\". Default will be 0. For ex. --day 0", default=0),
     argument("--hour", type=parse_hour_cron_style, help="Hour of day you want scheduled job to run on (0-23) or \"*\" (UTC). Default will be 0. For ex. --hour 16", default=0),
-    usage="vastai change bid id [--price PRICE]",
+    aliases=hidden_aliases(["change bid"]),
+    usage="vastai instance change-bid id [--price PRICE]",
     help="Change the bid price for a spot/interruptible instance",
     epilog=deindent("""
         Change the current bid price of instance id to PRICE.
         If PRICE is not specified, then a winning bid price is used as the default.
     """),
 )
-def change__bid(args: argparse.Namespace):
+def instance__change_bid(args: argparse.Namespace):
     """Alter the bid with id contained in args.
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -288,14 +290,15 @@ def change__bid(args: argparse.Namespace):
 
 @parser.command(
     argument("id", help="id of instance to delete", type=int),
-    usage="vastai destroy instance id [-h] [--api-key API_KEY] [--raw]",
+    aliases=hidden_aliases(["destroy instance"]),
+    usage="vastai instance destroy id [-h] [--api-key API_KEY] [--raw]",
     help="Destroy an instance (irreversible, deletes data)",
     epilog=deindent("""
         Perfoms the same action as pressing the "DESTROY" button on the website at https://console.vast.ai/instances/
-        Example: vastai destroy instance 4242
+        Example: vastai instance destroy 4242
     """),
 )
-def destroy__instance(args):
+def instance__destroy(args):
     """Perfoms the same action as pressing the "DESTROY" button on the website at https://console.vast.ai/instances/.
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -304,10 +307,11 @@ def destroy__instance(args):
 
 @parser.command(
     argument("ids", help="ids of instance to destroy", type=int, nargs='+'),
-    usage="vastai destroy instances [--raw] <id>",
+    aliases=hidden_aliases(["destroy instances"]),
+    usage="vastai instance destroy-batch [--raw] <id>",
     help="Destroy a list of instances (irreversible, deletes data)",
 )
-def destroy__instances(args):
+def instance__destroy_batch(args):
     """
     """
     for id in args.ids:
@@ -321,13 +325,14 @@ def destroy__instances(args):
     argument("--end_date", type=str, default=default_end_date(), help="End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)"),
     argument("--day", type=parse_day_cron_style, help="Day of week you want scheduled job to run on (0-6, where 0=Sunday) or \"*\". Default will be 0. For ex. --day 0", default=0),
     argument("--hour", type=parse_hour_cron_style, help="Hour of day you want scheduled job to run on (0-23) or \"*\" (UTC). Default will be 0. For ex. --hour 16", default=0),
-    usage="vastai execute id COMMAND",
+    aliases=hidden_aliases(["execute"]),
+    usage="vastai instance execute id COMMAND",
     help="Execute a (constrained) remote command on a machine",
     epilog=deindent("""
         Examples:
-          vastai execute 99999 'ls -l -o -r'
-          vastai execute 99999 'rm -r home/delete_this.txt'
-          vastai execute 99999 'du -d2 -h'
+          vastai instance execute 99999 'ls -l -o -r'
+          vastai instance execute 99999 'rm -r home/delete_this.txt'
+          vastai instance execute 99999 'du -d2 -h'
 
         available commands:
           ls                 List directory contents
@@ -339,7 +344,7 @@ def destroy__instances(args):
 
     """),
 )
-def execute(args):
+def instance__execute(args):
     """Execute a (constrained) remote command on a machine.
     :param argparse.Namespace args: should supply all the command-line options
     """
@@ -380,10 +385,11 @@ def execute(args):
 @parser.command(
     argument("id", help="id of instance to label", type=int),
     argument("label", help="label to set", type=str),
-    usage="vastai label instance <id> <label>",
+    aliases=hidden_aliases(["label instance"]),
+    usage="vastai instance label <id> <label>",
     help="Assign a string label to an instance",
 )
-def label__instance(args):
+def instance__label(args):
     """
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -433,7 +439,8 @@ def label__instance(args):
     argument("--force", help="Skip sanity checks when creating from an existing instance", action="store_true"),
     argument("--cancel-unavail", help="Return error if scheduling fails (rather than creating a stopped instance)", action="store_true"),
     argument("--template_hash",   help="template hash which contains all relevant information about an instance. This can be used as a replacement for other parameters describing the instance configuration", type=str),
-    usage="vastai launch instance [--help] [--api-key API_KEY] <gpu_name> <num_gpus> <image> [geolocation] [disk_space]",
+    aliases=hidden_aliases(["launch instance"]),
+    usage="vastai instance launch [--help] [--api-key API_KEY] <gpu_name> <num_gpus> <image> [geolocation] [disk_space]",
     help="Launch the top instance from the search offers based on the given parameters",
     epilog=deindent("""
         Launches an instance based on the given parameters. The instance will be created with the top offer from the search results.
@@ -447,10 +454,10 @@ def label__instance(args):
         Examples:
 
             # launch a single RTX 3090 instance with the pytorch image and 16 GB of disk space located anywhere
-            python vast.py launch instance -g RTX_3090 -n 1 -i pytorch/pytorch
+            python vast.py instance launch -g RTX_3090 -n 1 -i pytorch/pytorch
 
             # launch a 4x RTX 3090 instance with the pytorch image and 32 GB of disk space located in North America
-            python vast.py launch instance -g RTX_3090 -n 4 -i pytorch/pytorch -d 32.0 -r North_America
+            python vast.py instance launch -g RTX_3090 -n 4 -i pytorch/pytorch -d 32.0 -r North_America
 
         Available fields:
 
@@ -466,7 +473,7 @@ def label__instance(args):
             args:                   list      Arguments passed to the container's ENTRYPOINT, used only if '--args' is specified.
     """),
 )
-def launch__instance(args):
+def instance__launch(args):
     """Allows for a more streamlined and simplified way to create an instance.
 
     :param argparse.Namespace args: Namespace with many fields relevant to the endpoint.
@@ -577,10 +584,11 @@ def launch__instance(args):
     argument("--tail", help="Number of lines to show from the end of the logs (default '1000')", type=str),
     argument("--filter", help="Grep filter for log entries", type=str),
     argument("--daemon-logs", help="Fetch daemon system logs instead of container logs", action="store_true"),
-    usage="vastai logs INSTANCE_ID [OPTIONS] ",
+    aliases=hidden_aliases(["logs"]),
+    usage="vastai instance logs INSTANCE_ID [OPTIONS]",
     help="Get the logs for an instance",
 )
-def logs(args):
+def instance__logs(args):
     """Get the logs for an instance
     :param argparse.Namespace args: should supply all the command-line options
     """
@@ -619,10 +627,11 @@ def logs(args):
 @parser.command(
     argument("id", help="id of instance to prepay for", type=int),
     argument("amount", help="amount of instance credit prepayment (default discount func of 0.2 for 1 month, 0.3 for 3 months)", type=float),
-    usage="vastai prepay instance ID AMOUNT",
+    aliases=hidden_aliases(["prepay instance"]),
+    usage="vastai instance prepay ID AMOUNT",
     help="Deposit credits into reserved instance",
 )
-def prepay__instance(args):
+def instance__prepay(args):
     """
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
@@ -654,13 +663,14 @@ def prepay__instance(args):
     argument("--end_date", type=str, default=default_end_date(), help="End date/time in format 'YYYY-MM-DD HH:MM:SS PM' (UTC). Default is 7 days from now. (optional)"),
     argument("--day", type=parse_day_cron_style, help="Day of week you want scheduled job to run on (0-6, where 0=Sunday) or \"*\". Default will be 0. For ex. --day 0", default=0),
     argument("--hour", type=parse_hour_cron_style, help="Hour of day you want scheduled job to run on (0-23) or \"*\" (UTC). Default will be 0. For ex. --hour 16", default=0),
-    usage="vastai reboot instance ID [OPTIONS]",
+    aliases=hidden_aliases(["reboot instance"]),
+    usage="vastai instance reboot ID [OPTIONS]",
     help="Reboot (stop/start) an instance",
     epilog=deindent("""
         Stops and starts container without any risk of losing GPU priority.
     """),
 )
-def reboot__instance(args):
+def instance__reboot(args):
     """
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
@@ -690,13 +700,14 @@ def reboot__instance(args):
 
 @parser.command(
     argument("id", help="id of instance to recycle", type=int),
-    usage="vastai recycle instance ID [OPTIONS]",
+    aliases=hidden_aliases(["recycle instance"]),
+    usage="vastai instance recycle ID [OPTIONS]",
     help="Recycle (destroy/create) an instance",
     epilog=deindent("""
         Destroys and recreates container in place (from newly pulled image) without any risk of losing GPU priority.
     """),
 )
-def recycle__instance(args):
+def instance__recycle(args):
     """
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
@@ -718,17 +729,18 @@ def recycle__instance(args):
 
 @parser.command(
     argument("id", help="ID of instance to start/restart", type=int),
-    usage="vastai start instance ID [OPTIONS]",
+    aliases=hidden_aliases(["start instance"]),
+    usage="vastai instance start ID [OPTIONS]",
     help="Start a stopped instance",
     epilog=deindent("""
         This command attempts to bring an instance from the "stopped" state into the "running" state. This is subject to resource availability on the machine that the instance is located on.
         If your instance is stuck in the "scheduling" state for more than 30 seconds after running this, it likely means that the required resources on the machine to run your instance are currently unavailable.
         Examples:
-            vastai start instances $(vastai show instances -q)
-            vastai start instance 329838
+            vastai instance start-batch $(vastai instance list -q)
+            vastai instance start 329838
     """),
 )
-def start__instance(args):
+def instance__start(args):
     """
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -739,10 +751,11 @@ def start__instance(args):
 
 @parser.command(
     argument("ids", help="ids of instance to start", type=int, nargs='+'),
-    usage="vastai start instances [OPTIONS] ID0 ID1 ID2...",
+    aliases=hidden_aliases(["start instances"]),
+    usage="vastai instance start-batch [OPTIONS] ID0 ID1 ID2...",
     help="Start a list of instances",
 )
-def start__instances(args):
+def instance__start_batch(args):
     """
     for id in args.IDs:
         start_instance(id, args)
@@ -757,7 +770,8 @@ def start__instances(args):
 
 @parser.command(
     argument("id", help="id of instance to stop", type=int),
-    usage="vastai stop instance ID [OPTIONS]",
+    aliases=hidden_aliases(["stop instance"]),
+    usage="vastai instance stop ID [OPTIONS]",
     help="Stop a running instance",
     epilog=deindent("""
         This command brings an instance from the "running" state into the "stopped" state. When an instance is "stopped" all of your data on the instance is preserved,
@@ -765,7 +779,7 @@ def start__instances(args):
         There are ways to move data off of a stopped instance, which are described here: https://vast.ai/docs/gpu-instances/data-movement
     """)
 )
-def stop__instance(args):
+def instance__stop(args):
     """
 
     :param argparse.Namespace args: should supply all the command-line options
@@ -775,15 +789,16 @@ def stop__instance(args):
 
 @parser.command(
     argument("ids", help="ids of instance to stop", type=int, nargs='+'),
-    usage="vastai stop instances [OPTIONS] ID0 ID1 ID2...",
+    aliases=hidden_aliases(["stop instances"]),
+    usage="vastai instance stop-batch [OPTIONS] ID0 ID1 ID2...",
     help="Stop a list of instances",
     epilog=deindent("""
         Examples:
-            vastai stop instances $(vastai show instances -q)
-            vastai stop instances 329838 984849
+            vastai instance stop-batch $(vastai instance list -q)
+            vastai instance stop-batch 329838 984849
     """),
 )
-def stop__instances(args):
+def instance__stop_batch(args):
     """
     for id in args.IDs:
         stop_instance(id, args)
@@ -796,10 +811,11 @@ def stop__instances(args):
 
 @parser.command(
     argument("id", help="id of instance to get", type=int),
-    usage="vastai show instance [--api-key API_KEY] [--raw]",
+    aliases=hidden_aliases(["show instance"]),
+    usage="vastai instance show [--api-key API_KEY] [--raw]",
     help="Display user's current instances"
 )
-def show__instance(args):
+def instance__show(args):
     """
     Shows the stats on the machine the user is renting.
 
@@ -824,10 +840,11 @@ def show__instance(args):
 
 @parser.command(
     argument("-q", "--quiet", action="store_true", help="only display numeric ids"),
-    usage="vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]",
+    aliases=hidden_aliases(["show instances"]),
+    usage="vastai instance list [OPTIONS] [--api-key API_KEY] [--raw]",
     help="Display user's current instances"
 )
-def show__instances(args = None, extra = None):
+def instance__list(args = None, extra = None):
     """
     Shows the stats on the machine the user is renting.
 
@@ -867,13 +884,14 @@ def show__instances(args = None, extra = None):
     argument("--args", help="new arguments for the instance", type=str),
     argument("--env", help="new environment variables for the instance", type=json.loads),
     argument("--onstart", help="new onstart script for the instance", type=str),
-    usage="vastai update instance ID [OPTIONS]",
+    aliases=hidden_aliases(["update instance"]),
+    usage="vastai instance update ID [OPTIONS]",
     help="Update recreate an instance from a new/updated template",
     epilog=deindent("""
-        Example: vastai update instance 1234 --template_hash_id 661d064bbda1f2a133816b6d55da07c3
+        Example: vastai instance update 1234 --template_hash_id 661d064bbda1f2a133816b6d55da07c3
     """),
 )
-def update__instance(args):
+def instance__update(args):
     """
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:

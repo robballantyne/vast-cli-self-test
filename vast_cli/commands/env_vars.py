@@ -1,6 +1,6 @@
 """Commands for managing user environment variables."""
 
-from vast_cli.parser import parser, argument
+from vast_cli.parser import parser, argument, hidden_aliases
 from vast_cli import state
 from vast_cli.api.client import http_get, http_post, http_put, http_del
 from vast_cli.api.helpers import apiurl
@@ -9,10 +9,11 @@ from vast_cli.api.helpers import apiurl
 @parser.command(
     argument("name", help="Environment variable name", type=str),
     argument("value", help="Environment variable value", type=str),
-    usage="vastai create env-var <name> <value>",
+    aliases=hidden_aliases(["create env-var"]),
+    usage="vastai env-var create <name> <value>",
     help="Create a new user environment variable",
 )
-def create__env_var(args):
+def env_var__create(args):
     """Create a new environment variable for the current user."""
     url = apiurl(args, "/secrets/")
     data = {"key": args.name, "value": args.value}
@@ -28,10 +29,11 @@ def create__env_var(args):
 
 @parser.command(
     argument("name", help="Environment variable name to delete", type=str),
-    usage="vastai delete env-var <name>",
+    aliases=hidden_aliases(["delete env-var"]),
+    usage="vastai env-var delete <name>",
     help="Delete a user environment variable",
 )
-def delete__env_var(args):
+def env_var__delete(args):
     """Delete an environment variable for the current user."""
     url = apiurl(args, "/secrets/")
     data = {"key": args.name}
@@ -47,10 +49,11 @@ def delete__env_var(args):
 
 @parser.command(
     argument("-s", "--show-values", action="store_true", help="Show the values of environment variables"),
-    usage="vastai show env-vars [-s]",
+    aliases=hidden_aliases(["show env-vars"]),
+    usage="vastai env-var list [-s]",
     help="Show user environment variables",
 )
-def show__env_vars(args):
+def env_var__list(args):
     """Show the environment variables for the current user."""
     url = apiurl(args, "/secrets/")
     r = http_get(args, url, headers=state.headers)
@@ -85,10 +88,11 @@ def show__env_vars(args):
 @parser.command(
     argument("name", help="Environment variable name to update", type=str),
     argument("value", help="New environment variable value", type=str),
-    usage="vastai update env-var <name> <value>",
+    aliases=hidden_aliases(["update env-var"]),
+    usage="vastai env-var update <name> <value>",
     help="Update an existing user environment variable",
 )
-def update__env_var(args):
+def env_var__update(args):
     """Update an existing environment variable for the current user."""
     url = apiurl(args, "/secrets/")
     data = {"key": args.name, "value": args.value}
