@@ -14,7 +14,7 @@ import urllib3
 from typing import Dict, List
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from io import StringIO
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,68 +28,6 @@ from vast_cli.display.table import display_table
 from vast_cli.parser import argument
 from vast_cli.validation.validators import (convert_dates_to_timestamps, convert_timestamp_to_date,
                                              validate_frequency_values, string_to_unix_epoch)
-
-
-def get_runtype(args):
-    runtype = 'ssh'
-    if args.args:
-        runtype = 'args'
-    if (args.args == '') or (args.args == ['']) or (args.args == []):
-        runtype = 'args'
-        args.args = None
-    if not args.jupyter and (args.jupyter_dir or args.jupyter_lab):
-        args.jupyter = True
-    if args.jupyter and runtype == 'args':
-        print("Error: Can't use --jupyter and --args together. Try --onstart or --onstart-cmd instead of --args.", file=sys.stderr)
-        return 1
-
-    if args.jupyter:
-        runtype = 'jupyter_direc ssh_direc ssh_proxy' if args.direct else 'jupyter_proxy ssh_proxy'
-    elif args.ssh:
-        runtype = 'ssh_direc ssh_proxy' if args.direct else 'ssh_proxy'
-
-    return runtype
-
-
-def validate_volume_params(args):
-    if args.volume_size and not args.create_volume:
-        raise argparse.ArgumentTypeError("Error: --volume-size can only be used with --create-volume. Please specify a volume ask ID to create a new volume of that size.")
-    if (args.create_volume or args.link_volume) and not args.mount_path:
-        raise argparse.ArgumentTypeError("Error: --mount-path is required when creating or linking a volume.")
-
-    # This regex matches absolute or relative Linux file paths (no null bytes)
-    valid_linux_path_regex = re.compile(r'^(/)?([^/\0]+(/)?)+$')
-    if not valid_linux_path_regex.match(args.mount_path):
-        raise argparse.ArgumentTypeError(f"Error: --mount-path '{args.mount_path}' is not a valid Linux file path.")
-
-    volume_info = {
-        "mount_path": args.mount_path,
-        "create_new": True if args.create_volume else False,
-        "volume_id": args.create_volume if args.create_volume else args.link_volume
-    }
-    if args.volume_label:
-        volume_info["name"] = args.volume_label
-    if args.volume_size:
-        volume_info["size"] = args.volume_size
-    elif args.create_volume:  # If creating a new volume and size is not passed in, default size is 15GB
-        volume_info["size"] = 15
-
-    return volume_info
-
-
-def validate_portal_config(json_blob):
-    # jupyter runtypes already self-correct
-    if 'jupyter' in json_blob['runtype']:
-        return
-
-    # remove jupyter configs from portal_config if not a jupyter runtype
-    portal_config = json_blob['env']['PORTAL_CONFIG'].split("|")
-    filtered_config = [config_str for config_str in portal_config if 'jupyter' not in config_str.lower()]
-
-    if not filtered_config:
-        raise ValueError("Error: env variable PORTAL_CONFIG must contain at least one non-jupyter related config string if runtype is not jupyter")
-    else:
-        json_blob['env']['PORTAL_CONFIG'] = "|".join(filtered_config)
 
 
 def get_template_arguments():
@@ -222,62 +160,6 @@ def split_list(lst, k):
     return [lst[i:i + k] for i in range(0, len(lst), k)]
 
 
-def start_instance(id, args):
-
-    json_blob ={"state": "running"}
-    if isinstance(id,list):
-        url = apiurl(args, "/instances/")
-        json_blob["ids"] = id
-    else:
-        url = apiurl(args, "/instances/{id}/".format(id=id))
-
-    if (args.explain):
-        print("request json: ")
-        print(json_blob)
-    r = http_put(args, url, headers=state.headers, json=json_blob)
-    r.raise_for_status()
-
-    if (r.status_code == 200):
-        rj = r.json()
-        if (rj["success"]):
-            print("starting instance {id}.".format(**(locals())))
-        else:
-            print(rj["msg"])
-        return True
-    else:
-        print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
-    return False
-
-
-def stop_instance(id, args):
-
-    json_blob ={"state": "stopped"}
-    if isinstance(id,list):
-        url = apiurl(args, "/instances/")
-        json_blob["ids"] = id
-    else:
-        url = apiurl(args, "/instances/{id}/".format(id=id))
-
-    if (args.explain):
-        print("request json: ")
-        print(json_blob)
-    r = http_put(args, url, headers=state.headers, json=json_blob)
-    r.raise_for_status()
-
-    if (r.status_code == 200):
-        rj = r.json()
-        if (rj["success"]):
-            print("stopping instance {id}.".format(**(locals())))
-        else:
-            print(rj["msg"])
-        return True
-    else:
-        print(r.text)
-        print("failed with error {r.status_code}".format(**locals()))
-    return False
-
-
 def numeric_version(version_str):
     try:
         # Split the version string by the period
@@ -300,13 +182,6 @@ def numeric_version(version_str):
         print("Invalid version string format. Expected format: X.X.X")
         return None
 
-
-def sum(X, k):
-    y = 0
-    for x in X:
-        a = float(x.get(k,0))
-        y += a
-    return y
 
 def select(X, k):
     Y = set()
@@ -533,7 +408,6 @@ def filter_invoice_items(args: argparse.Namespace, rows: List) -> Dict:
     """
 
     try:
-        #import vast_pdf
         import dateutil
         from dateutil import parser
     except ImportError:
@@ -542,14 +416,6 @@ def filter_invoice_items(args: argparse.Namespace, rows: List) -> Dict:
         github repository. Just do 'git@github.com:vast-ai/vast-python.git' and then 'cd vast-python'. Once in that
         directory you can run 'vast.py' and it will have access to 'vast_pdf.py'. The library depends on a Python
         package called Borb to make the PDF files. To install this package do 'pip3 install borb'.\n""")
-
-    """
-    try:
-        vast_pdf
-    except NameError:
-        vast_pdf = Object()
-        vast_pdf.invoice_number = -1
-    """
 
     selector_flag = ""
     end_timestamp: float = 9999999999
@@ -705,6 +571,7 @@ def pretty_print_POST(req):
     ))
 
 
+@contextmanager
 def suppress_stdout():
     """
     A context manager to suppress standard output (stdout) within its block.
@@ -794,7 +661,7 @@ def destroy_instance_silent(id, args):
 
 def instance_exist(instance_id, api_key, args):
     # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands import show__instance
+    from vast_cli.commands.instances import show__instance
 
     if not hasattr(args, 'debugging'):
         args.debugging = False
@@ -868,7 +735,7 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
             - str: Reason for failure if the test was not successful, empty string otherwise.
     """
     # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands import show__instance
+    from vast_cli.commands.instances import show__instance
 
     # Temporarily disable SSL warnings
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -907,7 +774,7 @@ def run_machinetester(ip_address, port, instance_id, machine_id, delay, args, ap
             return 'unknown'
 
     # Prepare destroy_args with required attributes set to False as needed
-    destroy_args = argparse.Namespace(api_key=api_key, url="https://console.vast.ai", retry=3, explain=False, raw=args.raw, debbuging=args.debugging,)
+    destroy_args = argparse.Namespace(api_key=api_key, url="https://console.vast.ai", retry=3, explain=False, raw=args.raw, debugging=args.debugging,)
 
     # Delay start if specified
     if delay > 0:
@@ -1044,7 +911,7 @@ def check_requirements(machine_id, api_key, args):
             - list: A list of reasons why the machine does not meet the requirements.
     """
     # Import here to avoid circular imports - search__offers is a command function
-    from vast_cli.commands import search__offers
+    from vast_cli.commands.search import search__offers
 
     unmet_reasons = []
 
@@ -1160,7 +1027,7 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
 
     """
     # Import here to avoid circular imports - show__instance is a command function
-    from vast_cli.commands import show__instance
+    from vast_cli.commands.instances import show__instance
 
     if not hasattr(args, 'debugging'):
         args.debugging = False
@@ -1240,72 +1107,6 @@ def wait_for_instance(instance_id, api_key, args, destroy_args, timeout=900, int
     reason = f"Instance did not become running within {timeout} seconds. Verify network configuration. Use the self-test machine function in vast cli"
     progress_print(args, reason)
     return False, reason
-
-
-def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method, instance_id, contract_end_date):
-    start_timestamp, end_timestamp = convert_dates_to_timestamps(args)
-    if args.end_date is None:
-        end_timestamp=contract_end_date
-        args.end_date = convert_timestamp_to_date(contract_end_date)
-
-    if start_timestamp >= end_timestamp:
-        raise ValueError("--start_date must be less than --end_date.")
-
-    day, hour, frequency = args.day, args.hour, args.schedule
-
-    schedule_job_url = apiurl(args, f"/commands/schedule_job/")
-
-    request_body = {
-                "start_time": start_timestamp,
-                "end_time": end_timestamp,
-                "api_endpoint": api_endpoint,
-                "request_method": request_method,
-                "request_body": req_json,
-                "day_of_the_week": day,
-                "hour_of_the_day": hour,
-                "frequency": frequency,
-                "instance_id": instance_id
-            }
-                # Send a POST request
-    response = requests.post(schedule_job_url, headers=state.headers, json=request_body)
-
-    if args.explain:
-        print("request json: ")
-        print(request_body)
-
-        # Handle the response based on the status code
-    if response.status_code == 200:
-        print(f"add_scheduled_job insert: success - Scheduling {frequency} job to {cli_command} from {args.start_date} UTC to {args.end_date} UTC")
-    elif response.status_code == 401:
-        print(f"add_scheduled_job insert: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
-    elif response.status_code == 422:
-        user_input = input("Existing scheduled job found. Do you want to update it (y|n)? ")
-        if user_input.strip().lower() == "y":
-            scheduled_job_id = response.json()["scheduled_job_id"]
-            schedule_job_url = apiurl(args, f"/commands/schedule_job/{scheduled_job_id}/")
-            response = update_scheduled_job(cli_command, schedule_job_url, frequency, args.start_date, args.end_date, request_body)
-        else:
-            print("Job update aborted by the user.")
-    else:
-            # print(r.text)
-        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
-
-def update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
-    response = requests.put(schedule_job_url, headers=state.headers, json=request_body)
-
-        # Raise an exception for HTTP errors
-    response.raise_for_status()
-    if response.status_code == 200:
-        print(f"add_scheduled_job update: success - Scheduling {frequency} job to {cli_command} from {start_date} UTC to {end_date} UTC")
-        print(response.json())
-    elif response.status_code == 401:
-        print(f"add_scheduled_job update: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
-    else:
-            # print(r.text)
-        print(f"add_scheduled_job update: failed status_code: {response.status_code}.")
-        print(response.json())
-
-    return response
 
 
 def normalize_schedule_fields(job):

@@ -23,6 +23,19 @@ from vast_cli.validation.validators import (
 import requests
 
 
+def _update_scheduled_job(cli_command, schedule_job_url, frequency, start_date, end_date, request_body):
+    response = requests.put(schedule_job_url, headers=state.headers, json=request_body)
+
+    response.raise_for_status()
+    if response.status_code == 200:
+        print(f"add_scheduled_job update: success - Scheduling {frequency} job to {cli_command} from {start_date} UTC to {end_date} UTC")
+        print(response.json())
+    elif response.status_code == 401:
+        print(f"add_scheduled_job update: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
+    else:
+        print(f"add_scheduled_job update: failed error: {response.status_code}. Response body: {response.text}")
+
+
 def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method, instance_id, contract_end_date):
     start_timestamp, end_timestamp = convert_dates_to_timestamps(args)
     if args.end_date is None:
@@ -47,12 +60,28 @@ def add_scheduled_job(args, req_json, cli_command, api_endpoint, request_method,
                 "frequency": frequency,
                 "instance_id": instance_id
             }
-                # Send a POST request
+    # Send a POST request
     response = requests.post(schedule_job_url, headers=state.headers, json=request_body)
 
     if args.explain:
         print("request json: ")
         print(request_body)
+
+    # Handle the response based on the status code
+    if response.status_code == 200:
+        print(f"add_scheduled_job insert: success - Scheduling {frequency} job to {cli_command} from {args.start_date} UTC to {args.end_date} UTC")
+    elif response.status_code == 401:
+        print(f"add_scheduled_job insert: failed status_code: {response.status_code}. It could be because you aren't using a valid api_key.")
+    elif response.status_code == 422:
+        user_input = input("Existing scheduled job found. Do you want to update it (y|n)? ")
+        if user_input.strip().lower() == "y":
+            scheduled_job_id = response.json()["scheduled_job_id"]
+            schedule_job_url = apiurl(args, f"/commands/schedule_job/{scheduled_job_id}/")
+            response = _update_scheduled_job(cli_command, schedule_job_url, frequency, args.start_date, args.end_date, request_body)
+        else:
+            print("Job update aborted by the user.")
+    else:
+        print(f"add_scheduled_job insert: failed error: {response.status_code}. Response body: {response.text}")
 
 
 @parser.command(

@@ -32,7 +32,7 @@ from vast_cli.validation.validators import (
 from vast_cli.helpers import filter_invoice_items, format_invoices_charges_results
 
 
-def sum(X, k):
+def sum_field(X, k):
     y = 0
     for x in X:
         a = float(x.get(k,0))
@@ -224,7 +224,7 @@ def show__invoices(args):
     else:
         print(filter_header)
         display_table(rows, invoice_fields)
-        print(f"Total: ${sum(rows, 'amount')}")
+        print(f"Total: ${sum_field(rows, 'amount')}")
         print("Current: ", current_charges)
 
 

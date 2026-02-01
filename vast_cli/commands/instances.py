@@ -1005,13 +1005,15 @@ def show__instance(args):
     usage="vastai show instances [OPTIONS] [--api-key API_KEY] [--raw]",
     help="Display user's current instances"
 )
-def show__instances(args = {}, extra = {}):
+def show__instances(args = None, extra = None):
     """
     Shows the stats on the machine the user is renting.
 
     :param argparse.Namespace args: should supply all the command-line options
     :rtype:
     """
+    if args is None: args = {}
+    if extra is None: extra = {}
     req_url = apiurl(args, "/instances", {"owner": "me"});
     #r = http_get(req_url)
     r = http_get(args, req_url)

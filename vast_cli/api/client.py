@@ -50,11 +50,14 @@ def http_request(verb, args, req_url, headers: dict[str, str] | None = None, jso
 def http_get(args, req_url, headers = None, json = None):
     return http_request('GET', args, req_url, headers, json)
 
-def http_put(args, req_url, headers = None, json = {}):
+def http_put(args, req_url, headers = None, json = None):
+    if json is None: json = {}
     return http_request('PUT', args, req_url, headers, json)
 
-def http_post(args, req_url, headers = None, json={}):
+def http_post(args, req_url, headers = None, json = None):
+    if json is None: json = {}
     return http_request('POST', args, req_url, headers, json)
 
-def http_del(args, req_url, headers = None, json={}):
+def http_del(args, req_url, headers = None, json = None):
+    if json is None: json = {}
     return http_request('DELETE', args, req_url, headers, json)
