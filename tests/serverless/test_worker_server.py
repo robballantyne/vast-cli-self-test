@@ -199,3 +199,43 @@ class TestWorker:
         mock_root.addHandler.assert_called_once()
         added = mock_root.addHandler.call_args[0][0]
         assert isinstance(added, logging.StreamHandler)
+
+
+class TestGenericResponsePassthrough:
+    """The default response generator re-frames the engine's body."""
+
+    @pytest.mark.asyncio
+    async def test_engine_framing_headers_are_not_forwarded(
+        self, server_worker_config
+    ) -> None:
+        """
+        Verifies Content-Encoding and friends are dropped from a non-stream response.
+
+        This test verifies by:
+        1. Mocking an engine response that declares gzip and a Content-Length
+        2. Asserting the worker's response carries neither, and the body is intact
+
+        Assumptions:
+        - aiohttp decoded the body already, so the engine's framing no longer applies
+        """
+        from vastai.serverless.server.worker import EndpointHandlerFactory
+
+        factory = EndpointHandlerFactory(server_worker_config("handler"))
+        handler = factory.get_all_handlers()["/predict"]
+
+        model_response = MagicMock()
+        model_response.status = 200
+        model_response.content_type = "audio/mpeg"
+        model_response.headers = {
+            "Content-Type": "audio/mpeg",
+            "Content-Encoding": "gzip",
+            "Content-Length": "999",
+            "X-Engine": "keep-me",
+        }
+        model_response.read = AsyncMock(return_value=b"\xff\xfb\x90d")
+
+        res = await handler.generate_client_response(MagicMock(), model_response)
+
+        assert res.body == b"\xff\xfb\x90d"
+        assert "Content-Encoding" not in res.headers
+        assert res.headers.get("X-Engine") == "keep-me"

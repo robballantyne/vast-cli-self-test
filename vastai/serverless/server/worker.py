@@ -209,6 +209,10 @@ class EndpointHandlerFactory:
                     if user_request_parser:
                         try:
                             json_msg = user_request_parser(json_msg)
+                        except JsonDataException:
+                            # A parser rejecting the input is a bad request (422), not a
+                            # server error.
+                            raise
                         except Exception as e:
                             raise Exception(f"Error in user response handler: {e}")
 
@@ -340,6 +344,11 @@ class EndpointHandlerFactory:
 
                     headers = model_response.headers.copy()
                     headers.pop("Content-Type", None)
+                    # aiohttp decoded the body, so the engine's framing headers no longer
+                    # describe what we send: a forwarded Content-Encoding makes the client
+                    # try to decompress plain bytes.
+                    for framing in ("Content-Encoding", "Content-Length", "Transfer-Encoding"):
+                        headers.pop(framing, None)
 
                     return web.Response(
                         body=body,
