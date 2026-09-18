@@ -1454,6 +1454,213 @@ class TestServerlessQueueEndpointRequest:
         assert result["response"] == worker_json
         assert result["url"] == "https://worker/"
 
+    @pytest.mark.asyncio
+    async def test_queue_endpoint_request_sends_one_attempt_per_worker(
+        self,
+        client_with_session,
+        make_serverless_endpoint,
+        make_route_response_mock,
+        patch_serverless_queue_async_stubs,
+    ) -> None:
+        """
+        Verifies the worker call is made with retries=1, so the outer loop owns retrying.
+
+        This test verifies by:
+        1. Routing straight to READY
+        2. Asserting _make_request was awaited with retries=1
+
+        Assumptions:
+        - Stacking retries here would re-POST a job the worker may already have run
+        """
+        ep = make_serverless_endpoint(client_with_session)
+        ready = make_route_response_mock(
+            status="READY", url="https://worker/", request_idx=7, body={"token": "t"},
+        )
+
+        async def fake_route(*_a, **_kw):
+            return ready
+
+        worker = AsyncMock(return_value={"ok": True, "json": {"done": True}})
+        with (
+            patch.object(Endpoint, "_route", side_effect=fake_route),
+            patch("vastai.serverless.client.client._make_request", worker),
+        ):
+            await client_with_session.queue_endpoint_request(
+                endpoint=ep, worker_route="/do", worker_payload={}, cost=10,
+            )
+
+        assert worker.await_args.kwargs["retries"] == 1
+
+    async def test_queue_endpoint_request_returns_media_bytes_as_response(
+        self,
+        client_with_session,
+        make_serverless_endpoint,
+        make_route_response_mock,
+        patch_serverless_queue_async_stubs,
+    ) -> None:
+        """
+        Verifies a binary worker body is handed back as bytes with its content type.
+
+        This test verifies by:
+        1. Routing straight to READY
+        2. Patching _make_request to return ok with content bytes and no json
+        3. Asserting response is the bytes and content_type is surfaced
+
+        Assumptions:
+        - _make_request puts media bodies in `content` and leaves `json` None
+        """
+        ep = make_serverless_endpoint(client_with_session)
+        client = client_with_session
+        ready = make_route_response_mock(
+            status="READY", url="https://worker/", request_idx=7, body={"token": "t"},
+        )
+
+        async def fake_route(*_a, **_kw):
+            return ready
+
+        audio = b"\xff\xfb\x90\x64"
+        with (
+            patch.object(Endpoint, "_route", side_effect=fake_route),
+            patch(
+                "vastai.serverless.client.client._make_request",
+                new_callable=AsyncMock,
+                return_value={"ok": True, "json": None, "content": audio,
+                              "content_type": "audio/mpeg"},
+            ),
+        ):
+            result = await client.queue_endpoint_request(
+                endpoint=ep, worker_route="/v1/audio/speech",
+                worker_payload={"input": "hi"}, cost=10,
+            )
+
+        assert result["ok"] is True
+        assert result["response"] == audio
+        assert result["content_type"] == "audio/mpeg"
+
+    async def test_queue_endpoint_request_returns_text_as_response(
+        self,
+        client_with_session,
+        make_serverless_endpoint,
+        make_route_response_mock,
+        patch_serverless_queue_async_stubs,
+    ) -> None:
+        """
+        Verifies a text worker body is handed back as the response string.
+
+        This test verifies by:
+        1. Patching _make_request to return ok with text and neither json nor content
+        2. Asserting response is the text
+
+        Assumptions:
+        - _make_request returns text/* 2xx bodies in `text`
+        """
+        ep = make_serverless_endpoint(client_with_session)
+        ready = make_route_response_mock(
+            status="READY", url="https://worker/", request_idx=7, body={"token": "t"},
+        )
+
+        async def fake_route(*_a, **_kw):
+            return ready
+
+        with (
+            patch.object(Endpoint, "_route", side_effect=fake_route),
+            patch(
+                "vastai.serverless.client.client._make_request",
+                new_callable=AsyncMock,
+                return_value={"ok": True, "json": None, "content": None,
+                              "text": "1\n00:00:00,000 --> 00:00:01,000\nhi\n",
+                              "content_type": "text/plain"},
+            ),
+        ):
+            result = await client_with_session.queue_endpoint_request(
+                endpoint=ep, worker_route="/v1/audio/transcriptions",
+                worker_payload={"response_format": "srt"}, cost=10,
+            )
+
+        assert result["response"].startswith("1\n00:00:00")
+
+    async def test_queue_endpoint_request_does_not_retry_an_unreadable_2xx(
+        self,
+        client_with_session,
+        make_serverless_endpoint,
+        make_route_response_mock,
+        patch_serverless_queue_async_stubs,
+    ) -> None:
+        """
+        Verifies InvalidResponseError is raised once rather than retried.
+
+        This test verifies by:
+        1. Patching _make_request to raise InvalidResponseError
+        2. Asserting the error propagates and the worker was called exactly once
+
+        Assumptions:
+        - A 2xx means the worker ran the job; retrying would run it again
+        """
+        from vastai.serverless.client.connection import InvalidResponseError
+
+        ep = make_serverless_endpoint(client_with_session)
+        ready = make_route_response_mock(
+            status="READY", url="https://worker/", request_idx=7, body={"token": "t"},
+        )
+
+        async def fake_route(*_a, **_kw):
+            return ready
+
+        # A second call would succeed, so a retry shows up as "no exception" rather
+        # than as a hang.
+        worker = AsyncMock(side_effect=[InvalidResponseError("Invalid JSON"),
+                                        {"ok": True, "json": {"retried": True}}])
+        with (
+            patch.object(Endpoint, "_route", side_effect=fake_route),
+            patch("vastai.serverless.client.client._make_request", worker),
+        ):
+            with pytest.raises(InvalidResponseError):
+                await client_with_session.queue_endpoint_request(
+                    endpoint=ep, worker_route="/v1/x", worker_payload={}, cost=10,
+                )
+
+        assert worker.await_count == 1
+
+    async def test_queue_endpoint_request_other_errors_respect_max_retries(
+        self,
+        client_with_session,
+        make_serverless_endpoint,
+        make_route_response_mock,
+        patch_serverless_queue_async_stubs,
+    ) -> None:
+        """
+        Verifies a generic worker-call exception stops after max_retries.
+
+        This test verifies by:
+        1. Patching _make_request to always raise RuntimeError
+        2. Calling with max_retries=3 and asserting it raises after three attempts
+
+        Assumptions:
+        - The branch used to `continue` with no bound at all
+        """
+        ep = make_serverless_endpoint(client_with_session)
+        ready = make_route_response_mock(
+            status="READY", url="https://worker/", request_idx=7, body={"token": "t"},
+        )
+
+        async def fake_route(*_a, **_kw):
+            return ready
+
+        # A fourth call would succeed, so a missing bound fails fast instead of hanging.
+        worker = AsyncMock(side_effect=[RuntimeError("boom")] * 3
+                           + [{"ok": True, "json": {"unbounded": True}}])
+        with (
+            patch.object(Endpoint, "_route", side_effect=fake_route),
+            patch("vastai.serverless.client.client._make_request", worker),
+        ):
+            with pytest.raises(RuntimeError):
+                await client_with_session.queue_endpoint_request(
+                    endpoint=ep, worker_route="/v1/x", worker_payload={}, cost=10,
+                    max_retries=3,
+                )
+
+        assert worker.await_count == 3
+
 
 class TestServerlessQueueEndpointRequestBranches:
     """Additional queue_endpoint_request paths (timeouts, retries, session, cancel, stream)."""

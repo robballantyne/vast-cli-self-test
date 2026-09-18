@@ -79,6 +79,32 @@ async def _open_once(
     request_fn = {"GET": session.get, "POST": session.post, "PUT": session.put, "DELETE": session.delete}.get(method, session.post)
     return await request_fn(url + route, **kwargs)
 
+
+class InvalidResponseError(Exception):
+    """A 2xx response whose body could not be read.
+
+    The server did the work, so retrying repeats it; callers should not retry this.
+    """
+
+
+def _is_binary_content_type(content_type: str) -> bool:
+    """True for media bodies (audio/*, image/*, video/*, octet-stream, ...).
+
+    Pass the declared Content-Type header, not aiohttp's `content_type`, which reports
+    a missing header as application/octet-stream.
+    """
+    if not isinstance(content_type, str):
+        return False
+    ct = content_type.lower()
+    if not ct or ct.startswith("text/") or "json" in ct:
+        return False
+    return ct.startswith(("audio/", "image/", "video/")) or ct in (
+        "application/octet-stream",
+        "application/zip",
+        "application/pdf",
+    )
+
+
 async def _make_request(
     client,
     route: str,
@@ -105,6 +131,8 @@ async def _make_request(
         "headers": dict,
         "text": str,
         "json": Any|None,
+        "content": bytes|None,        # 2xx media bodies (audio/*, image/*, ...) only
+        "content_type": str|None,     # the declared type, without parameters
         "retryable": bool,
         "attempt": int
       }
@@ -228,25 +256,48 @@ async def _make_request(
             request_fn = {"GET": session.get, "POST": session.post, "PUT": session.put, "DELETE": session.delete}.get(method, session.post)
             async with await request_fn(full_url, **kwargs) as resp:
                 status = resp.status
-                text = await resp.text()
+                ok = 200 <= status < 300
+                declared = resp.headers.get("Content-Type") or ""
+                content_type = declared.split(";", 1)[0].strip().lower()
+                binary = _is_binary_content_type(content_type)
+                # resp.text() raises on a media body (audio starts with 0xff), so media is
+                # read as bytes. An error body is still decoded, leniently, so the caller
+                # sees the message.
+                raw = await resp.read() if binary else None
+                if not binary:
+                    text = await resp.text()
+                elif ok:
+                    text = ""
+                else:
+                    text = raw.decode("utf-8", errors="replace")
 
                 result: Dict[str, Any] = {
-                    "ok": 200 <= status < 300,
+                    "ok": ok,
                     "status": status,
                     "url": full_url,
                     "headers": dict(resp.headers),
                     "text": text,
                     "json": None,
+                    "content": raw if ok else None,
+                    "content_type": content_type or None,
                     "retryable": _retryable(status),
                     "attempt": attempt,
                 }
 
+                if result["ok"] and binary:
+                    # e.g. audio from /v1/audio/speech: the bytes are the response.
+                    return result
+
+                if result["ok"] and content_type.startswith("text/"):
+                    # e.g. a transcript requested as text/srt/vtt: the text is the response.
+                    return result
+
                 if result["ok"]:
-                    # Successful responses are expected to be JSON; invalid JSON is a hard failure
+                    # Other successful responses are expected to be JSON.
                     try:
                         result["json"] = await resp.json(content_type=None)
                     except Exception:
-                        raise Exception(f"Invalid JSON from {full_url}:\n{text}")
+                        raise InvalidResponseError(f"Invalid JSON from {full_url}:\n{text}")
 
                     # Debug: log the exact response
                     if hasattr(client, 'logger'):
@@ -277,6 +328,9 @@ async def _make_request(
             if attempt == retries:
                 raise TimeoutError(f"Request to {full_url} timed out after {timeout}s") from ex
             await asyncio.sleep(_backoff_delay(attempt))
+        except InvalidResponseError:
+            # The worker answered 2xx, so the job ran. Re-POSTing would run it again.
+            raise
         except Exception as ex:
             if attempt == retries:
                 raise ex

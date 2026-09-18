@@ -1,5 +1,5 @@
 # client.py
-from .connection import _make_request
+from .connection import InvalidResponseError, _make_request
 from .endpoint import Endpoint, Endpoint_
 from .managed import ManagedEndpoint, ManagedDeployment
 from .worker import Worker
@@ -778,9 +778,27 @@ class _ServerlessBase(Generic[R]):
                     )
                     tracker.status = "Retrying"
                     continue
+                except InvalidResponseError as ex:
+                    # The worker answered 2xx: the job ran. Retrying would run it again.
+                    self.logger.error(f"Worker response unreadable: {ex}")
+                    raise
                 except Exception as ex:
                     self.logger.error(f"Worker request failed: {ex}")
+                    if not retry or (
+                        max_retries is not None and total_attempts >= max_retries
+                    ):
+                        raise
+                    if timeout is not None and (time.time() - start_time) >= timeout:
+                        raise asyncio.TimeoutError(
+                            f"Request timed out after {time.time() - start_time:.1f}s"
+                        ) from ex
                     tracker.status = "Retrying"
+                    await asyncio.sleep(
+                        min(
+                            (2 ** min(total_attempts, 20)) + random.uniform(0, 1),
+                            self.max_poll_interval,
+                        )
+                    )
                     continue
 
                 if not result.get("ok"):
@@ -830,8 +848,15 @@ class _ServerlessBase(Generic[R]):
                         "auth_data": auth_data,
                     }
 
-                # Success
-                worker_response = result.get("stream") if stream else result.get("json")
+                # Success. A media body (audio, image, video) is returned as bytes.
+                if stream:
+                    worker_response = result.get("stream")
+                elif result.get("content") is not None:
+                    worker_response = result.get("content")
+                elif result.get("json") is not None:
+                    worker_response = result.get("json")
+                else:
+                    worker_response = result.get("text")
 
                 tracker.status = "Complete"
                 tracker.complete_time = time.time()
@@ -843,6 +868,7 @@ class _ServerlessBase(Generic[R]):
                     "ok": result.get("ok"),
                     "status": result.get("status"),
                     "text": result.get("text"),
+                    "content_type": result.get("content_type"),
                     "latency": tracker.complete_time - tracker.start_time,
                     "url": worker_url,
                     "request_idx": request_idx,

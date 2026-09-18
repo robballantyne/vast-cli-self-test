@@ -13,11 +13,50 @@ import pytest
 from vastai.serverless.client.connection import (
     _backoff_delay,
     _build_kwargs,
+    InvalidResponseError,
+    _is_binary_content_type,
     _iter_sse_json,
     _make_request,
     _open_once,
     _retryable,
 )
+
+
+class TestIsBinaryContentType:
+    """Only media types are treated as binary; anything textual keeps JSON handling."""
+
+    @pytest.mark.parametrize("ct", [
+        "audio/mpeg", "audio/wav", "image/png", "video/mp4", "application/octet-stream",
+    ])
+    def test_media_types_are_binary(self, ct) -> None:
+        """
+        Verifies media content types are classified as binary.
+
+        This test verifies by:
+        1. Passing each media type
+        2. Asserting True
+
+        Assumptions:
+        - These are the types OpenAI audio/image/video routes return
+        """
+        assert _is_binary_content_type(ct) is True
+
+    @pytest.mark.parametrize("ct", [
+        "application/json", "text/plain", "text/event-stream",
+        "application/problem+json", "", None,
+    ])
+    def test_textual_or_missing_types_are_not_binary(self, ct) -> None:
+        """
+        Verifies textual, JSON-flavoured, empty and missing types keep the old path.
+
+        This test verifies by:
+        1. Passing each textual or absent type
+        2. Asserting False
+
+        Assumptions:
+        - A mocked or absent content_type must not change existing behaviour
+        """
+        assert _is_binary_content_type(ct) is False
 
 
 class TestRetryable:
@@ -1389,6 +1428,216 @@ class TestMakeRequest:
 
         assert result["ok"] is False
         assert result["json"] is None
+
+    async def test_make_request_non_stream_binary_body_returns_bytes(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a 2xx media body is returned as bytes instead of failing JSON parsing.
+
+        This test verifies by:
+        1. Mocking a 200 with content_type audio/mpeg whose text() would raise
+        2. Asserting ok, content holds the bytes, json stays None, text() is never called
+
+        Assumptions:
+        - /v1/audio/speech returns raw audio; reading it as text raises UnicodeDecodeError
+        """
+        mock_resp = make_mock_http_response(status=200)
+        mock_resp.headers = {"Content-Type": "audio/mpeg"}
+        mock_resp.read = AsyncMock(return_value=b"\xff\xfb\x90\x64")
+        mock_resp.text = AsyncMock(side_effect=UnicodeDecodeError("utf-8", b"\xff", 0, 1, "x"))
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        result = await _make_request(
+            client=mock_client, route="/v1/audio/speech", api_key="sk-test",
+            url="https://worker.example.com", method="GET", retries=1,
+        )
+
+        assert result["ok"] is True
+        assert result["content"] == b"\xff\xfb\x90\x64"
+        assert result["content_type"] == "audio/mpeg"
+        assert result["json"] is None
+        mock_resp.text.assert_not_called()
+
+    async def test_make_request_non_stream_json_body_unchanged(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a JSON body still takes the text + JSON path and carries no content.
+
+        This test verifies by:
+        1. Mocking a 200 with content_type application/json
+        2. Asserting json is parsed, content is None, read() is never called
+
+        Assumptions:
+        - Only media types take the bytes path
+        """
+        mock_resp = make_mock_http_response(status=200, text='{"a": 1}', json_data={"a": 1})
+        mock_resp.headers = {"Content-Type": "application/json; charset=utf-8"}
+        mock_resp.read = AsyncMock()
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        result = await _make_request(
+            client=mock_client, route="/x", api_key="sk-test",
+            url="https://worker.example.com", method="GET", retries=1,
+        )
+
+        assert result["json"] == {"a": 1}
+        assert result["content"] is None
+        mock_resp.read.assert_not_called()
+
+    async def test_make_request_non_stream_missing_content_type_keeps_json_path(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a 2xx with no Content-Type header is still parsed as JSON.
+
+        This test verifies by:
+        1. Mocking a 200 whose headers carry no Content-Type, while aiohttp's
+           content_type reports application/octet-stream (its default)
+        2. Asserting json is parsed and read() is never called
+
+        Assumptions:
+        - aiohttp reports a missing header as application/octet-stream
+        """
+        mock_resp = make_mock_http_response(status=200, text='{"a": 1}', json_data={"a": 1})
+        mock_resp.content_type = "application/octet-stream"
+        mock_resp.read = AsyncMock()
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        result = await _make_request(
+            client=mock_client, route="/x", api_key="sk-test",
+            url="https://worker.example.com", method="GET", retries=1,
+        )
+
+        assert result["json"] == {"a": 1}
+        assert result["content"] is None
+        mock_resp.read.assert_not_called()
+
+    async def test_make_request_non_stream_text_body_is_returned_not_raised(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a 2xx text/plain body is returned as text.
+
+        This test verifies by:
+        1. Mocking a 200 text/plain transcript
+        2. Asserting ok, text is the body, json is None, and json() is never tried
+
+        Assumptions:
+        - OpenAI transcriptions with response_format text/srt/vtt return text/plain
+        """
+        mock_resp = make_mock_http_response(status=200, text="hello world")
+        mock_resp.headers = {"Content-Type": "text/plain; charset=utf-8"}
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        result = await _make_request(
+            client=mock_client, route="/v1/audio/transcriptions", api_key="sk-test",
+            url="https://worker.example.com", method="GET", retries=1,
+        )
+
+        assert result["ok"] is True
+        assert result["text"] == "hello world"
+        assert result["json"] is None
+        mock_resp.json.assert_not_called()
+
+    async def test_make_request_non_stream_binary_error_body_is_decoded(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a non-2xx with a media type keeps its body as text for the caller.
+
+        This test verifies by:
+        1. Mocking a 500 declared as audio/mpeg with an error message body
+        2. Asserting text carries the message and content is None
+
+        Assumptions:
+        - The caller builds its error from `text`
+        """
+        mock_resp = make_mock_http_response(status=500)
+        mock_resp.headers = {"Content-Type": "audio/mpeg"}
+        mock_resp.read = AsyncMock(return_value=b"engine exploded \xff")
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        result = await _make_request(
+            client=mock_client, route="/v1/audio/speech", api_key="sk-test",
+            url="https://worker.example.com", method="GET", retries=1,
+        )
+
+        assert result["ok"] is False
+        assert result["text"].startswith("engine exploded")
+        assert result["content"] is None
+
+    async def test_make_request_non_stream_invalid_json_raises_invalid_response(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies a 2xx JSON body that does not parse raises InvalidResponseError.
+
+        This test verifies by:
+        1. Mocking a 200 application/json whose json() raises
+        2. Asserting InvalidResponseError
+
+        Assumptions:
+        - Callers use this type to avoid re-running a job that already completed
+        """
+        mock_resp = make_mock_http_response(status=200, text="{nope",
+                                            json_side_effect=ValueError("bad"))
+        mock_resp.headers = {"Content-Type": "application/json"}
+        _, mock_client = make_request_http_mocks(mock_resp)
+
+        with pytest.raises(InvalidResponseError):
+            await _make_request(
+                client=mock_client, route="/x", api_key="sk-test",
+                url="https://worker.example.com", method="GET", retries=1,
+            )
+
+    async def test_make_request_does_not_repeat_an_unreadable_2xx(
+        self,
+        make_mock_http_response,
+        make_request_http_mocks,
+        patch_build_kwargs,
+    ) -> None:
+        """
+        Verifies an unreadable 2xx is not re-sent even when retries remain.
+
+        This test verifies by:
+        1. Mocking a 200 whose json() raises, with retries=3
+        2. Asserting InvalidResponseError and exactly one request
+
+        Assumptions:
+        - A 2xx means the worker ran the job; repeating it would run it twice
+        """
+        mock_resp = make_mock_http_response(status=200, text="{nope",
+                                            json_side_effect=ValueError("bad"))
+        mock_resp.headers = {"Content-Type": "application/json"}
+        mock_session, mock_client = make_request_http_mocks(mock_resp)
+
+        with pytest.raises(InvalidResponseError):
+            await _make_request(
+                client=mock_client, route="/x", api_key="sk-test",
+                url="https://worker.example.com", method="GET", retries=3,
+            )
+
+        assert mock_session.get.await_count == 1
 
     async def test_make_request_non_stream_timeout_retries_then_succeeds(
         self,
