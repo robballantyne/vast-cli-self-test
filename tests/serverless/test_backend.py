@@ -11,7 +11,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiohttp import ClientTimeout, web
+from aiohttp import ClientTimeout, FormData, web
 
 from vastai.serverless.server.lib.data_types import (
     JsonDataException,
@@ -1084,6 +1084,183 @@ class TestBackendHandleRequest:
         assert mock_sess.post.await_args.kwargs["json"] == {"input": {}}
 
     @pytest.mark.asyncio
+    async def test_call_api_posts_multipart_when_payload_supplies_fields(
+        self, pyworker_backend, make_mock_model_response
+    ) -> None:
+        """
+        Verifies __call_api posts multipart when generate_payload_multipart returns fields.
+
+        This test verifies by:
+        1. Stubbing a payload whose generate_payload_multipart returns a field mapping
+        2. Calling __call_api with a mock session
+        3. Asserting session.post got data=FormData and no json=, and that the JSON
+           builder was never consulted
+
+        Assumptions:
+        - Payloads returning None (every pre-existing one) keep the json= path, covered
+          by test_handle_request_call_api_uses_session_post above
+        """
+        backend = pyworker_backend
+        mock_sess = MagicMock()
+        mock_sess.post = AsyncMock(return_value=make_mock_model_response(body=b"{}"))
+        object.__setattr__(backend, "session", mock_sess)
+
+        payload = MagicMock()
+        payload.generate_payload_multipart.return_value = {
+            "file": ("a.wav", b"RIFF", "audio/wav"),
+            "model": "whisper-1",
+        }
+        handler = MagicMock(endpoint="http://model/v1/audio/transcriptions")
+
+        await backend._Backend__call_api(handler=handler, payload=payload)
+
+        kwargs = mock_sess.post.await_args.kwargs
+        assert kwargs["url"] == handler.endpoint
+        assert isinstance(kwargs["data"], FormData)
+        assert "json" not in kwargs
+        payload.generate_payload_json.assert_not_called()
+
+    def test_build_form_data_shapes_file_parts_and_coerces_scalars(self) -> None:
+        """
+        Verifies __build_form_data makes a file part from a 3-tuple and strings scalars.
+
+        This test verifies by:
+        1. Building FormData from one tuple field and one int field
+        2. Asserting the tuple carries filename + content type and the int became "0"
+
+        Assumptions:
+        - aiohttp rejects non-str, non-bytes field values, so coercion is required
+        """
+        from vastai.serverless.server.lib.backend import Backend
+
+        form = Backend._Backend__build_form_data(
+            {"file": ("a.wav", b"RIFF", "audio/wav"), "temperature": 0}
+        )
+        fields = {opts["name"]: (opts, headers, value)
+                  for opts, headers, value in form._fields}
+
+        opts, headers, value = fields["file"]
+        assert opts["filename"] == "a.wav"
+        assert headers["Content-Type"] == "audio/wav"
+        assert value == b"RIFF"
+        assert fields["temperature"][2] == "0"
+
+    def test_build_form_data_repeats_list_fields(self) -> None:
+        """
+        Verifies a list value emits one part per item under the same field name.
+
+        This test verifies by:
+        1. Building FormData from a list of two file tuples and a list of two scalars
+        2. Asserting four parts, with names repeated rather than collapsed
+
+        Assumptions:
+        - Multipart permits duplicate field names; this is how `image[]` multi-file
+          uploads are encoded, and a dict cannot express it any other way
+        """
+        from vastai.serverless.server.lib.backend import Backend
+
+        form = Backend._Backend__build_form_data({
+            "image": [("a.png", b"A", "image/png"), ("b.png", b"B", "image/png")],
+            "url": ["http://x/1.png", "http://x/2.png"],
+        })
+        names = [opts["name"] for opts, _headers, _value in form._fields]
+        assert names == ["image", "image", "url", "url"]
+        files = [(o.get("filename"), v) for o, _h, v in form._fields if o.get("filename")]
+        assert files == [("a.png", b"A"), ("b.png", b"B")]
+
+    def test_build_form_data_omits_none_and_encodes_dicts_and_bools(self) -> None:
+        """
+        Verifies None is omitted, dicts are JSON and bools are lowercase text.
+
+        This test verifies by:
+        1. Building FormData with a None, a dict, a bool and a None inside a list
+        2. Asserting no "None" part, valid JSON for the dict, and "true" for the bool
+
+        Assumptions:
+        - JSON clients send null for unset optional fields; "None" would reach the engine
+        """
+        import json as _json
+        from vastai.serverless.server.lib.backend import Backend
+
+        form = Backend._Backend__build_form_data({
+            "language": None,
+            "chunking_strategy": {"type": "server_vad"},
+            "stream": True,
+            "url": ["http://x/1.png", None],
+        })
+        parts = [(opts["name"], value) for opts, _headers, value in form._fields]
+        assert ("language", "None") not in parts
+        assert all(value != "None" for _name, value in parts)
+        assert _json.loads(dict(parts)["chunking_strategy"]) == {"type": "server_vad"}
+        assert ("stream", "true") in parts
+        assert [v for n, v in parts if n == "url"] == ["http://x/1.png"]
+
+    def test_build_form_data_is_multipart_without_a_file(self) -> None:
+        """
+        Verifies a form with only text fields is still encoded as multipart.
+
+        This test verifies by:
+        1. Building FormData from text fields only (an image edit given a `url`)
+        2. Rendering it and asserting a multipart/form-data content type
+
+        Assumptions:
+        - The OpenAI spec defines these routes as multipart
+        """
+        from vastai.serverless.server.lib.backend import Backend
+
+        form = Backend._Backend__build_form_data({"url": "http://x/a.png", "prompt": "p"})
+        assert form().content_type.startswith("multipart/form-data")
+
+    def test_build_form_data_rejects_malformed_file_parts(self) -> None:
+        """
+        Verifies a tuple that is not (filename, bytes, content_type) raises.
+
+        This test verifies by:
+        1. Building FormData from a 2-tuple
+        2. Asserting TypeError rather than a silent text field
+
+        Assumptions:
+        - A near-miss tuple used to be stringified and posted as text
+        """
+        from vastai.serverless.server.lib.backend import Backend
+
+        with pytest.raises(TypeError, match="file part"):
+            Backend._Backend__build_form_data({"file": ("a.wav", b"RIFF")})
+
+    @pytest.mark.asyncio
+    async def test_call_api_json_debug_log_carries_keys_not_values(
+        self, pyworker_backend, make_mock_model_response, caplog
+    ) -> None:
+        """
+        Verifies the JSON-path debug line logs payload keys, never values.
+
+        This test verifies by:
+        1. Posting a JSON payload carrying a secret-looking value
+        2. Asserting the value is absent from the log and the keys are present
+
+        Assumptions:
+        - Payloads carry prompts and inline media; the log is written to disk
+        """
+        import logging as _logging
+
+        backend = pyworker_backend
+        mock_sess = MagicMock()
+        mock_sess.post = AsyncMock(return_value=make_mock_model_response(body=b"{}"))
+        object.__setattr__(backend, "session", mock_sess)
+        payload = MagicMock()
+        payload.generate_payload_multipart.return_value = None
+        payload.generate_payload_json.return_value = {
+            "input": "hi", "ref_audio": "SECRET-VOICE-SAMPLE"}
+
+        with caplog.at_level(_logging.DEBUG):
+            await backend._Backend__call_api(
+                handler=MagicMock(endpoint="http://model/v1/audio/speech"),
+                payload=payload)
+
+        assert "SECRET-VOICE-SAMPLE" not in caplog.text
+        assert "ref_audio" in caplog.text
+
+    @pytest.mark.asyncio
     async def test_handle_request_verified_signature_allows_request(
         self, serverless_backend_testkit, make_serverless_test_rsa_key
     ) -> None:
@@ -1621,3 +1798,43 @@ class TestBackendHelpers:
         mock_log.debug.assert_called_once()
         assert "on_close POST exception" in mock_log.debug.call_args[0][0]
         mock_sess.post.assert_called_once()
+
+
+class TestBackendBenchmark:
+    """__run_benchmark against the handler the worker configured."""
+
+    @pytest.mark.asyncio
+    async def test_run_benchmark_uses_the_configured_handler(
+        self, pyworker_backend, tmp_path, monkeypatch
+    ) -> None:
+        """
+        Verifies the benchmark runs against the handler declaring a BenchmarkConfig.
+
+        This test verifies by:
+        1. Running the benchmark with warmup off and one run
+        2. Asserting every call used that handler and a score was written
+
+        Assumptions:
+        - A worker declares exactly one BenchmarkConfig
+        """
+        monkeypatch.chdir(tmp_path)
+        backend = pyworker_backend
+        handler = backend.benchmark_handler
+        handler.do_warmup_benchmark = False
+        handler.allow_parallel_requests = False
+        handler.benchmark_runs = 1
+        handler.make_benchmark_payload.return_value = MagicMock(
+            count_workload=MagicMock(return_value=500.0)
+        )
+        calls = []
+
+        async def fake_call(handler, payload):
+            calls.append(handler)
+            return MagicMock(status=200)
+
+        with patch.object(backend, "_Backend__call_backend", side_effect=fake_call):
+            score = await backend._Backend__run_benchmark()
+
+        assert score > 0
+        assert calls and all(h is handler for h in calls)
+        assert (tmp_path / ".has_benchmark").exists()
